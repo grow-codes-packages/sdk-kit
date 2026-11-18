@@ -1,7 +1,7 @@
 # TypeScript integration tests
 
 A consumer project: it installs the packed `@grow-codes/__KEY__` tarball (never the source tree)
-and runs the integration and conformance tests with `node --test` against a real **DISPLAY**.
+and runs the integration and conformance tests with `node --test` against a real __DISPLAY__.
 
 ```sh
 cd typescript && make pack            # writes dist/grow-codes-__KEY__-<version>.tgz

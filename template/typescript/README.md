@@ -1,6 +1,6 @@
-# @grow-codes/**KEY**
+# @grow-codes/__KEY__
 
-TypeScript SDK for [**DISPLAY**](https://grow-codes-packages.github.io/__KEY__/) by Grow Codes.
+TypeScript SDK for [__DISPLAY__](https://grow-codes-packages.github.io/__KEY__/) by Grow Codes.
 Node.js 22.12 or newer, ESM and CommonJS, full type definitions.
 
 ```sh
@@ -28,4 +28,4 @@ Test helpers (in-memory fakes and the conformance runner) live in
 `@grow-codes/__KEY__/testing`.
 
 Documentation: https://grow-codes-packages.github.io/__KEY__/ · Licence: Apache-2.0.
-**DISPLAY** is a trademark of **VENDOR**; this package is not affiliated with or endorsed by it.
+__DISPLAY__ is a trademark of __VENDOR__; this package is not affiliated with or endorsed by it.
