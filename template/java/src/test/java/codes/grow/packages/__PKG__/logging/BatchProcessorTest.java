@@ -387,10 +387,14 @@ class BatchProcessorTest {
     await(started);
     p.add(rec("b"));
     p.add(rec("c"));
+    // The worker is parked on the hanging export of "a", so "b" and "c" stay queued until the
+    // shutdown deadline; the timeout then drops both atomically and interrupts the export of "a".
     assertThatThrownBy(() -> p.shutdown(Duration.ofMillis(100)))
         .isInstanceOf(TimeoutException.class);
-    eventually(() -> p.stats().queued() == 0);
-    assertThat(drops).anyMatch(d -> d.startsWith("shutdown:"));
+    assertThat(drops).contains("shutdown:2");
+    eventually(() -> drops.size() == 2 && p.stats().queued() == 0);
+    assertThat(drops).containsExactlyInAnyOrder("shutdown:2", "export_failed:1");
+    assertThat(exporter.batchSizes()).containsExactly(1);
   }
 
   @Test

@@ -434,8 +434,8 @@ public final class BatchProcessor implements AutoCloseable {
   }
 
   /**
-   * Stops the worker from taking more batches and removes everything still queued, atomically, so
-   * a worker woken by the interrupt can never export records that shutdown already gave up on.
+   * Stops the worker from taking more batches and removes everything still queued, atomically, so a
+   * worker woken by the interrupt never exports records that shutdown already gave up on.
    */
   private List<LogRecord> stopAndTakeRemaining() {
     List<LogRecord> rest = new ArrayList<>();
