@@ -191,6 +191,16 @@ TLS/proxy; Rust: `reqwest` with `rustls-tls`, `default-features = false`; Go: `n
 - Status mapping per 2.1 when retries are exhausted or the status is not retryable.
 - Every attempt calls hooks (2.5). Retries are counted in hook data (`attempt`, starting at 1).
 
+**Cloud SDK services (exception).** `aws-secrets-manager` and `aws-cloudwatch-logs` use the official
+AWS SDK of each language as their transport (TS AWS SDK v3, Rust `aws-sdk-*`, Go AWS SDK v2, Python
+boto3 + aioboto3, Java AWS SDK v2). The Grow config maps onto the SDK client: `url` → endpoint
+override, timeouts → SDK timeouts, `retry.maxRetries` → standard retry mode with `maxAttempts =
+maxRetries + 1`, proxy/TLS where the SDK supports it; credentials come from the standard AWS chain or
+explicit config. A caller may pass an existing SDK client. Errors are mapped by **AWS error code**
+(not HTTP status) to the SPEC 2.1 classes, keeping `requestId`. Hooks are fired from SDK middleware
+/ interceptors where the SDK allows it (documented per language). The core `HttpTransport` is
+still generated (shared tests) but unused by the AWS clients.
+
 ### 2.4 Client surface (every service)
 
 ```

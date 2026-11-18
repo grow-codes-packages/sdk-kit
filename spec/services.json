@@ -78,8 +78,8 @@
     "categories": [
       "secrets"
     ],
-    "image": "motoserver/moto (pinned tag) \u2013 AWS emulator",
-    "port": "5000 (moto)",
+    "image": "motoserver/moto:5.2.4",
+    "port": 5000,
     "upstreamLicense": "Proprietary managed service; AWS SDKs Apache-2.0",
     "vendor": "Amazon.com, Inc. or its affiliates",
     "env": "standard AWS chain (`AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `AWS_PROFILE`, `AWS_ENDPOINT_URL_SECRETS_MANAGER`), `GROW_AWS_SECRETS_*`",
@@ -195,8 +195,8 @@
     "categories": [
       "logging"
     ],
-    "image": "motoserver/moto (pinned tag) \u2013 AWS emulator",
-    "port": "5000 (moto)",
+    "image": "motoserver/moto:5.2.4",
+    "port": 5000,
     "upstreamLicense": "Proprietary managed service; AWS SDKs Apache-2.0",
     "vendor": "Amazon.com, Inc. or its affiliates",
     "env": "standard AWS chain + `AWS_ENDPOINT_URL_CLOUDWATCH_LOGS`, `CLOUDWATCH_LOG_GROUP`, `CLOUDWATCH_LOG_STREAM`, `GROW_CLOUDWATCH_LOGS_*`",
