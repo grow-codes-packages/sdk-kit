@@ -52,7 +52,7 @@ lang="$$1"
 suffix=$$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom 2>/dev/null | head -c 8)
 project="__KEY__-$$lang-$${suffix:-$$$$}"
 compose() { docker compose -f "$(COMPOSE_FILE)" -p "$$project" --profile "$$lang" "$$@"; }
-cleanup() { compose down -v --remove-orphans >/dev/null 2>&1 || true; }
+cleanup() { rc=$$?; if [ "$$rc" -ne 0 ] && [ -n "$${COMPOSE_LOGS_DIR:-}" ]; then mkdir -p "$$COMPOSE_LOGS_DIR"; compose logs --no-color --timestamps > "$$COMPOSE_LOGS_DIR/$$project.log" 2>&1 || true; fi; compose down -v --remove-orphans >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
