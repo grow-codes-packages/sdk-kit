@@ -1,0 +1,356 @@
+# Reusable release pipeline for Grow Codes SDK repos (sdk-kit). (sdk-kit's own release is
+# release.yml; this file is the one generated repos call.)
+#
+# release-please (manifest mode, one component per language folder) opens/updates the release
+# PR on every push to main; when that PR is merged it tags the released components and the
+# publish jobs below run for each released folder:
+#
+#   typescript/ → npm      `npm publish --provenance` (trusted publishing via OIDC, or NPM_TOKEN)
+#   rust/       → crates.io trusted publishing (rust-lang/crates-io-auth-action) or CARGO_REGISTRY_TOKEN
+#   go/         → tag only: ensures the `go/v<version>` tag exists, then warms proxy.golang.org
+#   java/       → Maven Central with the central-publishing-maven-plugin (`release` profile) + GPG
+#   python/     → builds wheel + sdist as the artifact `python-dist`. The PyPI upload must run in
+#                 the CALLER workflow (PyPI trusted publishing does not accept reusable
+#                 workflows), see template/common/.github/workflows/release.yml.
+#
+# Registry access is set up later by the owner, so every publish job checks its credential or
+# trust switch first and, when it is missing, ends green with a notice instead of failing.
+# Switches (caller inputs, usually fed from repository variables):
+#   npm-trusted-publishing    true once npmjs.com lists this repo's release.yml as trusted publisher
+#   crates-trusted-publishing true once crates.io lists this repo's release.yml as trusted publisher
+# Secrets (all optional): NPM_TOKEN, CARGO_REGISTRY_TOKEN, MAVEN_CENTRAL_USERNAME,
+# MAVEN_CENTRAL_PASSWORD (Central Portal user token), MAVEN_GPG_PRIVATE_KEY, MAVEN_GPG_PASSPHRASE,
+# RELEASE_PLEASE_TOKEN (a token that lets the release PR trigger CI; default GITHUB_TOKEN).
+#
+# Required release-please config (repo root, template/common/release-please-config.json):
+# packages "typescript" (node), "rust" (rust), "go" (go, component "go", "tag-separator": "/"
+# so tags read go/v1.2.3), "python" (python), "java" (maven).
+name: release-packages
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+      config-file:
+        description: release-please config file.
+        type: string
+        default: release-please-config.json
+      manifest-file:
+        description: release-please manifest file.
+        type: string
+        default: .release-please-manifest.json
+      npm-trusted-publishing:
+        description: npm trusted publishing (OIDC) is configured for this repo.
+        type: boolean
+        default: false
+      crates-trusted-publishing:
+        description: crates.io trusted publishing is configured for this repo.
+        type: boolean
+        default: false
+      go-module:
+        description: Go module path (default github.com/<owner>/<repo>/go).
+        type: string
+        default: ""
+    secrets:
+      RELEASE_PLEASE_TOKEN:
+        required: false
+      NPM_TOKEN:
+        required: false
+      CARGO_REGISTRY_TOKEN:
+        required: false
+      MAVEN_CENTRAL_USERNAME:
+        required: false
+      MAVEN_CENTRAL_PASSWORD:
+        required: false
+      MAVEN_GPG_PRIVATE_KEY:
+        required: false
+      MAVEN_GPG_PASSPHRASE:
+        required: false
+    outputs:
+      releases-created:
+        description: "'true' when release-please created at least one release."
+        value: ${{ jobs.release-please.outputs.releases-created }}
+      paths-released:
+        description: JSON array of released folders.
+        value: ${{ jobs.release-please.outputs.paths-released }}
+      typescript-version:
+        description: Released npm version.
+        value: ${{ jobs.release-please.outputs.typescript-version }}
+      rust-version:
+        description: Released crate version.
+        value: ${{ jobs.release-please.outputs.rust-version }}
+      go-version:
+        description: Released Go module version (tag go/v<version>).
+        value: ${{ jobs.release-please.outputs.go-version }}
+      java-version:
+        description: Released Maven version.
+        value: ${{ jobs.release-please.outputs.java-version }}
+      python-release-created:
+        description: "'true' when python/ was released; the caller then uploads `python-dist` to PyPI."
+        value: ${{ jobs.release-please.outputs.python-release-created }}
+      python-version:
+        description: Released PyPI version.
+        value: ${{ jobs.release-please.outputs.python-version }}
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      releases-created: ${{ steps.rp.outputs.releases_created }}
+      paths-released: ${{ steps.rp.outputs.paths_released }}
+      typescript-release-created: ${{ steps.rp.outputs['typescript--release_created'] }}
+      typescript-version: ${{ steps.rp.outputs['typescript--version'] }}
+      rust-release-created: ${{ steps.rp.outputs['rust--release_created'] }}
+      rust-version: ${{ steps.rp.outputs['rust--version'] }}
+      go-release-created: ${{ steps.rp.outputs['go--release_created'] }}
+      go-version: ${{ steps.rp.outputs['go--version'] }}
+      go-sha: ${{ steps.rp.outputs['go--sha'] }}
+      java-release-created: ${{ steps.rp.outputs['java--release_created'] }}
+      java-version: ${{ steps.rp.outputs['java--version'] }}
+      python-release-created: ${{ steps.rp.outputs['python--release_created'] }}
+      python-version: ${{ steps.rp.outputs['python--version'] }}
+    steps:
+      - name: release-please
+        id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: ${{ inputs.config-file }}
+          manifest-file: ${{ inputs.manifest-file }}
+
+  npm:
+    name: publish npm
+    needs: release-please
+    if: needs.release-please.outputs.typescript-release-created == 'true'
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing + provenance
+    steps:
+      - name: Check npm access
+        id: gate
+        env:
+          TRUSTED: ${{ inputs.npm-trusted-publishing }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ "$TRUSTED" = "true" ] || [ -n "$NPM_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=npm publish skipped::No npm trusted publisher (input npm-trusted-publishing) and no NPM_TOKEN secret. Configure one and re-run this job."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check out
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Ensure npm >= 11.5.1 (trusted publishing)
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          if ! node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a==11&&(b>5||(b==5&&c>=1)))?0:1)' "$(npm --version)"; then
+            npm install -g npm@11
+          fi
+          npm --version
+      - name: Build and pack
+        if: steps.gate.outputs.enabled == 'true'
+        run: make -C typescript deps pack
+      - name: Publish
+        if: steps.gate.outputs.enabled == 'true'
+        working-directory: typescript
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -- dist/*.tgz
+          if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then echo "::error::expected one tarball in typescript/dist"; exit 1; fi
+          npm publish "$1" --provenance --access public
+
+  crates:
+    name: publish crates.io
+    needs: release-please
+    if: needs.release-please.outputs.rust-release-created == 'true'
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # crates.io trusted publishing
+    steps:
+      - name: Check crates.io access
+        id: gate
+        env:
+          TRUSTED: ${{ inputs.crates-trusted-publishing }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ "$TRUSTED" = "true" ] || [ -n "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=crates.io publish skipped::No crates.io trusted publisher (input crates-trusted-publishing) and no CARGO_REGISTRY_TOKEN secret. Configure one and re-run this job."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check out
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Rust
+        if: steps.gate.outputs.enabled == 'true'
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master (2026-11-15)
+        with:
+          toolchain: stable
+      - name: crates.io token (trusted publishing)
+        id: auth
+        if: steps.gate.outputs.enabled == 'true' && inputs.crates-trusted-publishing
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+      - name: Publish
+        if: steps.gate.outputs.enabled == 'true'
+        working-directory: rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish
+
+  go:
+    name: publish Go module
+    needs: release-please
+    if: needs.release-please.outputs.go-release-created == 'true'
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 15
+    permissions:
+      contents: write # pushes the go/v<version> tag when release-please used another tag name
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: stable
+          cache: false
+      - name: Ensure the go/v<version> tag
+        env:
+          VERSION: ${{ needs.release-please.outputs.go-version }}
+          SHA: ${{ needs.release-please.outputs.go-sha || github.sha }}
+        run: |
+          tag="go/v${VERSION}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" > /dev/null; then
+            echo "Tag ${tag} exists."
+          else
+            git tag "${tag}" "${SHA}"
+            git push origin "refs/tags/${tag}"
+            echo "Created ${tag} at ${SHA}."
+          fi
+      - name: Warm up proxy.golang.org
+        env:
+          VERSION: ${{ needs.release-please.outputs.go-version }}
+          MODULE: ${{ inputs.go-module || format('github.com/{0}/go', github.repository) }}
+          GOPROXY: https://proxy.golang.org
+          GOFLAGS: -mod=mod
+        working-directory: ${{ runner.temp }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if go list -m -json "${MODULE}@v${VERSION}"; then
+              echo "::notice title=Go module published::${MODULE}@v${VERSION} is on proxy.golang.org"
+              exit 0
+            fi
+            sleep $((attempt * 20))
+          done
+          echo "::warning title=Go proxy warm-up::${MODULE}@v${VERSION} not visible yet; the proxy fetches it on first use."
+
+  maven:
+    name: publish Maven Central
+    needs: release-please
+    if: needs.release-please.outputs.java-release-created == 'true'
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check Maven Central access
+        id: gate
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+        run: |
+          if [ -n "$MAVEN_CENTRAL_USERNAME" ] && [ -n "$MAVEN_CENTRAL_PASSWORD" ] && [ -n "$MAVEN_GPG_PRIVATE_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Maven Central publish skipped::Set MAVEN_CENTRAL_USERNAME, MAVEN_CENTRAL_PASSWORD (Central Portal user token) and MAVEN_GPG_PRIVATE_KEY (+ MAVEN_GPG_PASSPHRASE) and re-run this job."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check out
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Temurin with Central credentials and GPG
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/pom.xml
+          server-id: central
+          server-username-env-var: MAVEN_CENTRAL_USERNAME
+          server-password-env-var: MAVEN_CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase-env-var: MAVEN_GPG_PASSPHRASE
+      - name: Deploy (central-publishing-maven-plugin)
+        if: steps.gate.outputs.enabled == 'true'
+        working-directory: java
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: |
+          if ! grep -q '<id>release</id>' pom.xml; then
+            echo "::error title=Maven Central::java/pom.xml has no 'release' profile (central-publishing-maven-plugin + maven-gpg-plugin)"
+            exit 1
+          fi
+          mvn -B -ntp -T 1 -P release -DskipTests deploy
+
+  python-build:
+    name: build Python distributions
+    needs: release-please
+    if: needs.release-please.outputs.python-release-created == 'true'
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Build wheel and sdist
+        env:
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: make -C python PYTHON="$PYTHON" deps pack
+      - name: Upload distributions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: python-dist
+          path: python/dist/
+          if-no-files-found: error
+          retention-days: 7

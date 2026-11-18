@@ -1,0 +1,64 @@
+# sdk-kit release: release-please (Python strategy, bumps sdk_kit/__init__.py) keeps a release PR
+# open on main; merging it tags vX.Y.Z (first release v0.1.0) and creates the GitHub release.
+# Then the moving major tag (v0) is pointed at the release so generated repos can call
+#   grow-codes-packages/sdk-kit/.github/workflows/<workflow>.yml@v0
+# and check out sdk-kit@v0.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release-created: ${{ steps.rp.outputs.release_created }}
+      tag-name: ${{ steps.rp.outputs.tag_name }}
+      major: ${{ steps.rp.outputs.major }}
+      sha: ${{ steps.rp.outputs.sha }}
+    steps:
+      - name: release-please
+        id: rp
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
+
+  major-tag:
+    name: move major tag
+    needs: release-please
+    if: needs.release-please.outputs.release-created == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Point v<major> at the release
+        env:
+          MAJOR: ${{ needs.release-please.outputs.major }}
+          TAG: ${{ needs.release-please.outputs.tag-name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          sha=$(git rev-parse "refs/tags/${TAG}^{commit}")
+          git tag -f -a "v${MAJOR}" -m "sdk-kit ${TAG}" "$sha"
+          git push -f origin "refs/tags/v${MAJOR}"
+          echo "::notice title=Moving tag::v${MAJOR} -> ${TAG} (${sha})"

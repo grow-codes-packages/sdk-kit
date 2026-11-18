@@ -1,0 +1,21 @@
+# sdk-kit: keep the pinned actions of the reusable workflows and of the template workflows
+# (template/common/.github/workflows) current. Language dependencies of the templates are
+# bumped by hand in template/<lang>/ (they must stay identical across the 17 generated repos).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories: ["/", "/template/common"]
+    schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }
+    commit-message: { prefix: "ci" }
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: pip
+    directories: ["/docs", "/template/common/docs"]
+    schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }
+    commit-message: { prefix: "docs" }
+    groups:
+      docs:
+        patterns: ["*"]

@@ -1,0 +1,100 @@
+# Reusable Java pipeline for Grow Codes SDK repos (sdk-kit).
+#
+# Runs the language Makefile contract (deps lint build test coverage license pack) in
+# `working-directory` with Eclipse Temurin. Java 21 runs every target (Spotless, -Werror,
+# JaCoCo gates, licence allowlist, jar + sources + javadoc) and uploads `coverage/summary.json`
+# as `coverage-java` plus the jars as `dist-java`; Java 17 (the bytecode baseline) and 25 build
+# and test.
+#
+#   jobs:
+#     java:
+#       uses: grow-codes-packages/sdk-kit/.github/workflows/lang-java.yml@main
+name: lang-java
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Folder that holds the Maven project and its Makefile.
+        type: string
+        default: java
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+      source-artifact:
+        description: Optional artifact holding `source.tar` (a rendered repo) used instead of a checkout.
+        type: string
+        default: ""
+      upload-artifacts:
+        description: Upload coverage-java and dist-java from the primary job.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  java:
+    name: java (${{ matrix.java }})
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - java: "17"
+            targets: deps build test
+            primary: false
+          - java: "21"
+            targets: deps lint build test coverage license pack
+            primary: true
+          - java: "25"
+            targets: deps build test
+            primary: false
+    env:
+      WD: ${{ inputs.working-directory }}
+      MAVEN_ARGS: -B -ntp -T 1
+    steps:
+      - name: Check out
+        if: inputs.source-artifact == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download rendered source
+        if: inputs.source-artifact != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.source-artifact }}
+          path: ${{ runner.temp }}/source
+      - name: Unpack rendered source
+        if: inputs.source-artifact != ''
+        run: tar -xf "$RUNNER_TEMP/source/source.tar" -C "$GITHUB_WORKSPACE"
+
+      - name: Set up Temurin ${{ matrix.java }}
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+          cache-dependency-path: ${{ inputs.working-directory }}/pom.xml
+
+      - name: make ${{ matrix.targets }}
+        run: make -C "$WD" ${{ matrix.targets }}
+
+      - name: Upload coverage summary
+        if: matrix.primary && inputs.upload-artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-java
+          path: ${{ inputs.working-directory }}/coverage/summary.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload package
+        if: matrix.primary && inputs.upload-artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-java
+          path: ${{ inputs.working-directory }}/dist/
+          if-no-files-found: error
+          retention-days: 7

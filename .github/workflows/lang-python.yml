@@ -1,0 +1,99 @@
+# Reusable Python pipeline for Grow Codes SDK repos (sdk-kit).
+#
+# Runs the language Makefile contract (deps lint build test coverage license pack) in
+# `working-directory`. Python 3.13 runs every target (ruff, mypy --strict, pytest-cov gates,
+# pip-licenses, wheel + sdist) and uploads `coverage/summary.json` as `coverage-python` plus
+# the distributions as `dist-python`; 3.10 (the SPEC minimum) and 3.14 build and test.
+#
+#   jobs:
+#     python:
+#       uses: grow-codes-packages/sdk-kit/.github/workflows/lang-python.yml@main
+name: lang-python
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Folder that holds the Python project and its Makefile.
+        type: string
+        default: python
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+      source-artifact:
+        description: Optional artifact holding `source.tar` (a rendered repo) used instead of a checkout.
+        type: string
+        default: ""
+      upload-artifacts:
+        description: Upload coverage-python and dist-python from the primary job.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: python (${{ matrix.python }})
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.10"
+            targets: deps build test
+            primary: false
+          - python: "3.13"
+            targets: deps lint build test coverage license pack
+            primary: true
+          - python: "3.14"
+            targets: deps build test
+            primary: false
+    env:
+      WD: ${{ inputs.working-directory }}
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - name: Check out
+        if: inputs.source-artifact == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download rendered source
+        if: inputs.source-artifact != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.source-artifact }}
+          path: ${{ runner.temp }}/source
+      - name: Unpack rendered source
+        if: inputs.source-artifact != ''
+        run: tar -xf "$RUNNER_TEMP/source/source.tar" -C "$GITHUB_WORKSPACE"
+
+      - name: Set up Python ${{ matrix.python }}
+        id: python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: make ${{ matrix.targets }}
+        env:
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: make -C "$WD" PYTHON="$PYTHON" ${{ matrix.targets }}
+
+      - name: Upload coverage summary
+        if: matrix.primary && inputs.upload-artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-python
+          path: ${{ inputs.working-directory }}/coverage/summary.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload package
+        if: matrix.primary && inputs.upload-artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-python
+          path: ${{ inputs.working-directory }}/dist/
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,251 @@
+# Reusable documentation build + GitHub Pages deploy for Grow Codes SDK repos (sdk-kit).
+#
+# 1. Builds the MkDocs Material site from the repo root `mkdocs.yml` (pinned tools in
+#    `docs/requirements.txt`; the Python API reference is rendered in-site by mkdocstrings).
+# 2. Builds the per-language API references with the language Makefiles (`make docs`) and copies
+#    them into the site: TypeDoc → api/typescript/, rustdoc → api/rust/, Javadoc → api/java/.
+#    Go links to pkg.go.dev (doc comments are rendered there).
+# 3. Writes shields.io endpoint badges `badges/coverage-<lang>.json` from the `coverage-<lang>`
+#    artifacts of the current run (CI calls this workflow after the language jobs) or, when the
+#    run has none, of the latest successful run of `coverage-workflow` on the default branch.
+# 4. With `deploy: true`, deploys to GitHub Pages (actions/deploy-pages). When Pages is not set
+#    to "GitHub Actions" in the repo settings yet, the deploy job skips with a notice.
+#
+#   jobs:
+#     docs:
+#       needs: [typescript, rust, go, python, java]
+#       uses: grow-codes-packages/sdk-kit/.github/workflows/docs.yml@main
+#       permissions: { contents: read, actions: read, pages: write, id-token: write }
+#       with:
+#         deploy: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+name: docs
+
+on:
+  workflow_call:
+    inputs:
+      deploy:
+        description: Deploy the built site to GitHub Pages.
+        type: boolean
+        default: false
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+      api-reference:
+        description: Build the TypeDoc, rustdoc and Javadoc references (false = MkDocs only).
+        type: boolean
+        default: true
+      coverage-workflow:
+        description: >-
+          Workflow file whose latest successful default-branch run provides the coverage-*
+          artifacts when the current run has none (empty = current run only).
+        type: string
+        default: ci.yml
+      source-artifact:
+        description: Optional artifact holding `source.tar` (a rendered repo) used instead of a checkout.
+        type: string
+        default: ""
+    outputs:
+      page-url:
+        description: URL of the deployed site (empty when not deployed).
+        value: ${{ jobs.deploy.outputs.page-url }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build site
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read # coverage artifacts of an earlier CI run
+    env:
+      SITE_DIR: ${{ github.workspace }}/_site
+      MAVEN_ARGS: -B -ntp -T 1
+      CARGO_TERM_COLOR: always
+      NO_MKDOCS_2_WARNING: "1"
+    steps:
+      - name: Check out
+        if: inputs.source-artifact == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download rendered source
+        if: inputs.source-artifact != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.source-artifact }}
+          path: ${{ runner.temp }}/source
+      - name: Unpack rendered source
+        if: inputs.source-artifact != ''
+        run: tar -xf "$RUNNER_TEMP/source/source.tar" -C "$GITHUB_WORKSPACE"
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Install MkDocs
+        run: |
+          python -m pip install --disable-pip-version-check -r docs/requirements.txt
+          mkdocs --version
+
+      - name: Set up Node
+        if: inputs.api-reference
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Set up Rust
+        if: inputs.api-reference
+        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master (2026-11-15)
+        with:
+          toolchain: stable
+      - name: Set up Temurin
+        if: inputs.api-reference
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/pom.xml
+
+      - name: Build MkDocs site
+        run: mkdocs build --strict --site-dir "$SITE_DIR"
+
+      - name: TypeDoc (TypeScript API)
+        if: inputs.api-reference
+        run: |
+          make -C typescript deps docs
+          mkdir -p "$SITE_DIR/api/typescript"
+          cp -R typescript/docs/api/. "$SITE_DIR/api/typescript/"
+      - name: rustdoc (Rust API)
+        if: inputs.api-reference
+        run: |
+          make -C rust docs
+          doc_dir="${CARGO_TARGET_DIR:-rust/target}/doc"
+          mkdir -p "$SITE_DIR/api/rust"
+          cp -R "$doc_dir/." "$SITE_DIR/api/rust/"
+          crate=$(sed -n 's/^name = "\(grow_[a-z0-9_]*\)"$/\1/p' rust/Cargo.toml | head -n1)
+          if [ -n "$crate" ]; then
+            printf '<!doctype html><meta http-equiv="refresh" content="0; url=%s/index.html">\n' "$crate" \
+              > "$SITE_DIR/api/rust/index.html"
+          fi
+      - name: Javadoc (Java API)
+        if: inputs.api-reference
+        run: |
+          make -C java docs
+          for d in java/target/reports/apidocs java/target/site/apidocs java/target/apidocs; do
+            if [ -f "$d/index.html" ]; then
+              mkdir -p "$SITE_DIR/api/java"
+              cp -R "$d/." "$SITE_DIR/api/java/"
+              exit 0
+            fi
+          done
+          echo "::error title=Javadoc::make -C java docs produced no index.html"
+          exit 1
+
+      - name: Coverage artifacts of this run
+        id: cov-current
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-*
+          path: ${{ runner.temp }}/coverage
+      - name: Find the latest successful CI run
+        id: cov-run
+        if: inputs.coverage-workflow != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW: ${{ inputs.coverage-workflow }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if compgen -G "$RUNNER_TEMP/coverage/coverage-*/summary.json" > /dev/null; then
+            echo "Coverage artifacts found in this run."
+            exit 0
+          fi
+          run_id=$(gh run list -R "$GITHUB_REPOSITORY" --workflow "$WORKFLOW" --branch "$BRANCH" \
+            --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)
+          if [ -z "$run_id" ]; then
+            echo "::notice title=Coverage badges::no successful $WORKFLOW run on $BRANCH yet; badges show 'unknown'"
+          fi
+          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
+      - name: Coverage artifacts of the latest CI run
+        if: steps.cov-run.outputs.run-id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: coverage-*
+          path: ${{ runner.temp }}/coverage
+          run-id: ${{ steps.cov-run.outputs.run-id }}
+          github-token: ${{ github.token }}
+      - name: Write coverage badges
+        shell: python
+        run: |
+          import json, os, pathlib
+
+          cov = pathlib.Path(os.environ["RUNNER_TEMP"]) / "coverage"
+          out = pathlib.Path(os.environ["SITE_DIR"]) / "badges"
+          out.mkdir(parents=True, exist_ok=True)
+          for lang in ("typescript", "rust", "go", "python", "java"):
+              badge = {"schemaVersion": 1, "label": f"coverage {lang}", "message": "unknown", "color": "lightgrey"}
+              summary = cov / f"coverage-{lang}" / "summary.json"
+              if summary.is_file():
+                  data = json.loads(summary.read_text())
+                  lines = float(data["lines"]["pct"])
+                  branches = (data.get("branches") or {}).get("pct")
+                  low = min(lines, float(branches)) if branches is not None else lines
+                  badge["message"] = f"{lines:.1f}%" + (f" | branches {float(branches):.1f}%" if branches is not None else "")
+                  badge["color"] = "brightgreen" if low >= 90 else "yellow" if low >= 80 else "red"
+              (out / f"coverage-{lang}.json").write_text(json.dumps(badge) + "\n")
+              print(lang, badge["message"])
+
+      - name: Upload site (Pages)
+        if: inputs.deploy
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site/
+      - name: Upload site (preview)
+        if: ${{ !inputs.deploy }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docs-site
+          path: _site/
+          retention-days: 7
+
+  deploy:
+    name: deploy to GitHub Pages
+    if: inputs.deploy
+    needs: build
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 15
+    permissions:
+      actions: read # deploy-pages reads the artifact of this run
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages-${{ github.repository }}
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page-url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check Pages settings
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          build_type=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.build_type' 2>/dev/null || true)
+          if [ "$build_type" = "workflow" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=GitHub Pages not configured::Set Settings > Pages > Source to 'GitHub Actions' to publish the docs. Deploy skipped."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Deploy
+        id: deployment
+        if: steps.pages.outputs.enabled == 'true'
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

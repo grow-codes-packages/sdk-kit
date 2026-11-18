@@ -1,0 +1,87 @@
+# Reusable `sdk-kit check` for a generated Grow Codes SDK repo (sdk-kit).
+#
+# Checks out sdk-kit at `sdk-kit-ref` next to the repo and runs `sdk-kit check --dest .`:
+# manifest (.sdk-kit.json), required files and badges, no template tokens left, generated files
+# unmodified. Also reports (without failing) whether `sdk-kit sync` would change anything.
+#
+#   jobs:
+#     check:
+#       uses: grow-codes-packages/sdk-kit/.github/workflows/sdk-kit-check.yml@main
+name: sdk-kit-check
+
+on:
+  workflow_call:
+    inputs:
+      sdk-kit-ref:
+        description: sdk-kit git ref to check against (branch, tag such as v0, or SHA).
+        type: string
+        default: main
+      working-directory:
+        description: Repo root.
+        type: string
+        default: "."
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+      source-artifact:
+        description: Optional artifact holding `source.tar` (a rendered repo) used instead of a checkout.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: sdk-kit check
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 10
+    env:
+      WD: ${{ inputs.working-directory }}
+    steps:
+      - name: Check out
+        if: inputs.source-artifact == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download rendered source
+        if: inputs.source-artifact != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.source-artifact }}
+          path: ${{ runner.temp }}/source
+      - name: Unpack rendered source
+        if: inputs.source-artifact != ''
+        run: tar -xf "$RUNNER_TEMP/source/source.tar" -C "$GITHUB_WORKSPACE"
+
+      - name: Check out sdk-kit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: grow-codes-packages/sdk-kit
+          ref: ${{ inputs.sdk-kit-ref }}
+          path: .sdk-kit-checkout
+          persist-credentials: false
+      - name: Move sdk-kit out of the repo tree
+        run: mv .sdk-kit-checkout "$RUNNER_TEMP/sdk-kit"
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: sdk-kit check
+        run: |
+          "$RUNNER_TEMP/sdk-kit/bin/sdk-kit" --version
+          "$RUNNER_TEMP/sdk-kit/bin/sdk-kit" check --dest "$WD"
+      - name: sdk-kit sync --dry-run (report only)
+        if: always()
+        env:
+          SDK_KIT_REF: ${{ inputs.sdk-kit-ref }}
+        run: |
+          if ! "$RUNNER_TEMP/sdk-kit/bin/sdk-kit" sync --dest "$WD" --dry-run > "$RUNNER_TEMP/sync.txt" 2>&1; then
+            echo "::warning title=sdk-kit sync::locally modified generated files; see the job log"
+          fi
+          cat "$RUNNER_TEMP/sync.txt"
+          if grep -qE '^would (update|create|remove):' "$RUNNER_TEMP/sync.txt"; then
+            echo "::notice title=sdk-kit sync::this repo is behind sdk-kit ${SDK_KIT_REF}; run 'sdk-kit sync'"
+          fi
