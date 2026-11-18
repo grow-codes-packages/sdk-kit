@@ -1,0 +1,6 @@
+{
+  "categories": {
+    "logging": ["zapadapter"],
+    "tracing": ["grpcadapter"]
+  }
+}
