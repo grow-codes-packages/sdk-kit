@@ -340,7 +340,7 @@
       "tracing"
     ],
     "image": "datadog/agent (OTLP receiver) + datadog/fakeintake; optional live Datadog sandbox",
-    "port": 4318,
+    "port": 8126,
     "upstreamLicense": "Proprietary SaaS; Datadog agent/clients Apache-2.0 (dd-trace libraries are Apache-2.0/BSD-3)",
     "vendor": "Datadog, Inc.",
     "env": "`DD_API_KEY`, `DD_APP_KEY` (query), `DD_SITE`, `DD_AGENT_HOST`, `DD_TRACE_AGENT_PORT`, `DD_SERVICE`, `DD_ENV`, `DD_VERSION`, `GROW_DATADOG_APM_*`",
