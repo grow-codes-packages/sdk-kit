@@ -503,7 +503,7 @@ Format (`spec/schemas/scenario.schema.json`):
   supplied by the service test (default `grow-conformance/${run}/`), `${<saveName>}` = value saved
   by an earlier step's `save`.
 - `requires`: capabilities the target must declare (`write`, `versions`, `delete`, `query`, `tail`,
-  `dependencies`, `labels`, `streams`); the runner **skips** (and reports) scenarios whose
+  `dependencies`, `labels`, `streams`, `version` (serverVersion is supported), `services` (listServices)); the runner **skips** (and reports) scenarios whose
   requirements the service test does not declare. Skips must be justified in the service docs.
 - Expectations: `reveal` (string equality of `SecretValue.reveal()`), `equals` (deep JSON
   equality), `null: true`, `notNull: true`, `true`/`false`, `error: "<ErrorCode>"`, `contains`
