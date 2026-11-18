@@ -59,7 +59,7 @@ versions with the same API usually work; see [Compatibility](#compatibility) and
 | Language | Package | Install |
 | - | - | - |
 | TypeScript (Node.js ≥ 22.12) | `@grow-codes/__KEY__` | `npm install @grow-codes/__KEY__` |
-| Rust (MSRV 1.85) | `grow-__KEY__` | `cargo add grow-__KEY__` |
+| Rust (MSRV 1.88) | `grow-__KEY__` | `cargo add grow-__KEY__` |
 | Go (1.26+) | `github.com/grow-codes-packages/__KEY__/go` | `go get github.com/grow-codes-packages/__KEY__/go` |
 | Python (≥ 3.10) | `grow-__KEY__` | `pip install grow-__KEY__` |
 | Java (17+) | `codes.grow.packages:__KEY__` | see below |
@@ -241,7 +241,7 @@ stack is always removed afterwards (`docker compose down -v`). Unit tests need n
 
 | | TypeScript | Rust | Go | Python | Java |
 | - | - | - | - | - | - |
-| Runtime | Node.js ≥ 22.12, ESM + CJS | stable, MSRV 1.85 | 1.26, 1.27 | 3.10 – 3.14 | 17, 21, 25 |
+| Runtime | Node.js ≥ 22.12, ESM + CJS | stable, MSRV 1.88 | 1.26, 1.27 | 3.10 – 3.14 | 17, 21, 25 |
 | Async | `Promise` + `AbortSignal` | `async` (tokio), `blocking` feature | `context.Context` | sync + `asyncio` | sync + `CompletableFuture` |
 | __DISPLAY__ | `__IMAGE__` | `__IMAGE__` | `__IMAGE__` | `__IMAGE__` | `__IMAGE__` |
 

@@ -18,7 +18,7 @@ conventions (see [Compatibility](compatibility.md) for runtime versions).
 
 === "Rust"
 
-    Rust 1.85 or newer (edition 2021), tokio runtime.
+    Rust 1.88 or newer (edition 2021), tokio runtime.
 
     ```sh
     cargo add grow-__KEY__

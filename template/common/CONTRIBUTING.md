@@ -29,7 +29,7 @@ reported privately, see [SECURITY.md](SECURITY.md).
 
 ## Development setup
 
-You need Node.js 22.12+, Rust (stable, MSRV 1.85), Go 1.26+, Python 3.10+, JDK 17+ with Maven 3.9,
+You need Node.js 22.12+, Rust (stable, MSRV 1.88), Go 1.26+, Python 3.10+, JDK 17+ with Maven 3.9,
 GNU Make and Docker with Compose v2.
 
 ```sh

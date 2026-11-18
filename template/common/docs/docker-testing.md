@@ -64,6 +64,6 @@ Each package ships in-memory fakes so your application tests need neither Docker
 
 ## CI
 
-The `ci` workflow runs the unit pipelines (TypeScript on Node 22 and 24, Rust stable and 1.85,
+The `ci` workflow runs the unit pipelines (TypeScript on Node 22 and 24, Rust stable and 1.88,
 Go 1.26 and 1.27, Python 3.10, 3.13 and 3.14, Java 17, 21 and 25) and one Docker integration job
 per language. Failed Docker jobs upload the Compose logs as the artifact `compose-logs-<lang>`.

@@ -3,7 +3,7 @@
 # Runs the language Makefile contract (deps lint build test coverage license pack) in
 # `working-directory`. The stable toolchain runs every target (clippy, cargo-llvm-cov,
 # cargo-deny, cargo package) and uploads `coverage/summary.json` as `coverage-rust` plus the
-# `.crate` as `dist-rust`; the MSRV toolchain (1.85, SPEC section 7) builds and tests.
+# `.crate` as `dist-rust`; the MSRV toolchain (1.88, SPEC section 7) builds and tests.
 #
 #   jobs:
 #     rust:
@@ -24,7 +24,7 @@ on:
       msrv:
         description: Minimum supported Rust version (built and tested, not linted).
         type: string
-        default: "1.85"
+        default: "1.88"
       source-artifact:
         description: Optional artifact holding `source.tar` (a rendered repo) used instead of a checkout.
         type: string

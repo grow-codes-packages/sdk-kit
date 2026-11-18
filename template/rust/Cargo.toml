@@ -3,7 +3,7 @@
 name = "grow-__KEY__"
 version = "__VERSION__"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.88"
 # MSRV-aware dependency resolution (picks versions that still build on rust-version).
 resolver = "3"
 description = "Rust SDK for __DISPLAY__ by Grow Codes"

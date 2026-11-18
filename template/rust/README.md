@@ -28,6 +28,6 @@ async fn main() -> grow___KEY_SNAKE__::Result<()> {
 - Retries with full-jitter backoff and `Retry-After`, connect/request/total timeouts,
   cancellation (drop the future or pass a `CancellationToken`), request hooks, `tracing` debug
   events.
-- MSRV 1.85. Licence Apache-2.0. Documentation: https://grow-codes-packages.github.io/__KEY__/
+- MSRV 1.88. Licence Apache-2.0. Documentation: https://grow-codes-packages.github.io/__KEY__/
 
 Development: `make deps build lint test coverage license pack docs` (see `Makefile`).

@@ -13,7 +13,7 @@ language folder.
 | Workflow | Matrix (primary in bold) | Primary job extras |
 | - | - | - |
 | `lang-typescript.yml` | Node 22, **24** | artifacts `coverage-typescript`, `dist-typescript` |
-| `lang-rust.yml` | **stable**, MSRV 1.85 (build + test) | cargo-llvm-cov, cargo-deny; artifacts `coverage-rust`, `dist-rust` |
+| `lang-rust.yml` | **stable**, MSRV 1.88 (build + test) | cargo-llvm-cov, cargo-deny; artifacts `coverage-rust`, `dist-rust` |
 | `lang-go.yml` | **1.26**, 1.27 | golangci-lint, go-licenses; artifact `coverage-go` |
 | `lang-python.yml` | 3.10, **3.13**, 3.14 | artifacts `coverage-python`, `dist-python` |
 | `lang-java.yml` | Temurin 17, **21**, 25 | artifacts `coverage-java`, `dist-java` |

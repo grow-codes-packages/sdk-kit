@@ -43,6 +43,7 @@ public final class BatchProcessor implements AutoCloseable {
   private volatile int inflight;
   private boolean exportPending;
   private boolean shutdown;
+  private boolean stopped;
   private CompletableFuture<Void> shutdownFuture;
 
   /**
@@ -251,8 +252,11 @@ public final class BatchProcessor implements AutoCloseable {
               .whenComplete(
                   (v, e) -> {
                     if (e != null) {
+                      List<LogRecord> rest = stopAndTakeRemaining();
                       worker.shutdownNow();
-                      dropRemaining();
+                      if (!rest.isEmpty()) {
+                        drop(rest, DropReason.SHUTDOWN);
+                      }
                     }
                   });
       return shutdownFuture;
@@ -348,7 +352,7 @@ public final class BatchProcessor implements AutoCloseable {
     try {
       List<LogRecord> batch = new ArrayList<>();
       long bytes = 0;
-      while (!queue.isEmpty() && batch.size() < options.maxBatchSize()) {
+      while (!stopped && !queue.isEmpty() && batch.size() < options.maxBatchSize()) {
         Entry next = queue.peekFirst();
         if (!batch.isEmpty() && bytes + next.bytes > options.maxBatchBytes()) {
           break;
@@ -429,21 +433,25 @@ public final class BatchProcessor implements AutoCloseable {
     }
   }
 
-  private void dropRemaining() {
+  /**
+   * Stops the worker from taking more batches and removes everything still queued, atomically, so
+   * a worker woken by the interrupt can never export records that shutdown already gave up on.
+   */
+  private List<LogRecord> stopAndTakeRemaining() {
     List<LogRecord> rest = new ArrayList<>();
     lock.lock();
     try {
+      stopped = true;
       for (Entry e : queue) {
         rest.add(e.record);
       }
       queue.clear();
       queuedBytes = 0;
+      notFull.signalAll();
     } finally {
       lock.unlock();
     }
-    if (!rest.isEmpty()) {
-      drop(Collections.unmodifiableList(rest), DropReason.SHUTDOWN);
-    }
+    return Collections.unmodifiableList(rest);
   }
 
   private void drop(List<LogRecord> records, DropReason reason) {
