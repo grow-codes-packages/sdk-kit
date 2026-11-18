@@ -227,6 +227,7 @@ def sources_for(kit: Kit, service: Service) -> list[Source]:
     sources.append(Source(tpl / "docker", "docker"))
     sources += [Source(tpl / "examples" / lang, f"examples/{lang}") for lang in LANGS]
     sources.append(Source(kit.conformance, "conformance", raw=True))
+    sources.append(Source(kit.root / "spec" / "schemas", "conformance/schemas", raw=True))
     if service.key == "demo":
         sources.append(Source(kit.demo, "demo", raw=True))
     return [s for s in sources if s.root.is_dir()]
