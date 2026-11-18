@@ -7,6 +7,8 @@ raises this subclass (chained to the original), so ``except __SERVICE__Error`` s
 ``code == ErrorCode.CANCELLED`` while asyncio (``Task``, ``TaskGroup``, ``asyncio.timeout`` on
 Python 3.12+, ``wait_for``) still recognises the task as cancelled. Because it is also an
 :class:`Exception`, a broad ``except Exception`` will catch it; re-raise it in that case.
+Code awaiting a cancelled *task* from outside gets the plain ``asyncio.CancelledError`` on
+Python 3.10 (asyncio creates a fresh one); the SDK subclass is visible inside the task.
 """
 
 from __future__ import annotations

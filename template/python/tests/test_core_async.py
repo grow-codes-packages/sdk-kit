@@ -11,7 +11,7 @@ import pytest
 import respx
 
 import grow___KEY_SNAKE__ as sdk
-from _support import MockServer, Reply, closed_port_url, fast_retry, make_config
+from _support import MockServer, Reply, closed_port_url, fast_retry, make_config, spawn_capturing
 
 TOKEN = "async-secret-token-456"
 
@@ -110,26 +110,30 @@ async def test_core_cancel_during_request_async(server: MockServer) -> None:
     """core.cancel (task cancelled during the request)"""
     server.enqueue("/x", Reply(200, delay=2.0))
     t = transport(server.url)
-    task = asyncio.ensure_future(t.request(get()))
+    errors: list[BaseException] = []
+    task = spawn_capturing(t.request(get()), errors)
     await asyncio.sleep(0.1)
     task.cancel()
-    with pytest.raises(sdk.CancelledError) as info:
+    with pytest.raises(asyncio.CancelledError):
         await task
-    assert isinstance(info.value, asyncio.CancelledError)
-    assert info.value.code == sdk.ErrorCode.CANCELLED
     assert task.cancelled()
+    err = errors[0]
+    assert isinstance(err, sdk.CancelledError)
+    assert isinstance(err, asyncio.CancelledError)
+    assert err.code == sdk.ErrorCode.CANCELLED
 
 
 async def test_core_cancel_during_backoff_async(server: MockServer) -> None:
     """core.cancel (task cancelled during the backoff sleep)"""
     server.defaults["/x"] = Reply(503, headers={"Retry-After": "5"})
     t = transport(server.url)
-    task = asyncio.ensure_future(t.request(get()))
+    errors: list[BaseException] = []
+    task = spawn_capturing(t.request(get()), errors)
     await asyncio.sleep(0.3)
     task.cancel()
-    with pytest.raises(asyncio.CancelledError) as info:
+    with pytest.raises(asyncio.CancelledError):
         await task
-    assert isinstance(info.value, sdk.CancelledError)
+    assert isinstance(errors[0], sdk.CancelledError)
     assert len(server.seen) == 1
 
 
@@ -143,11 +147,14 @@ async def test_cancellation_works_with_wait_for(server: MockServer) -> None:
 async def test_close_during_backoff_async(server: MockServer) -> None:
     server.defaults["/x"] = Reply(503, headers={"Retry-After": "5"})
     t = transport(server.url)
-    task = asyncio.ensure_future(t.request(get()))
+    errors: list[BaseException] = []
+    task = spawn_capturing(t.request(get()), errors)
     await asyncio.sleep(0.3)
     await t.aclose()
-    with pytest.raises(sdk.CancelledError, match="closed"):
+    with pytest.raises(asyncio.CancelledError):
         await task
+    assert isinstance(errors[0], sdk.CancelledError)
+    assert "closed" in str(errors[0])
     with pytest.raises(sdk.CancelledError, match="closed"):
         await t.request(get())
 
@@ -155,11 +162,13 @@ async def test_close_during_backoff_async(server: MockServer) -> None:
 async def test_close_during_request_async(server: MockServer) -> None:
     server.defaults["/x"] = Reply(200, delay=1.0)
     t = transport(server.url)
-    task = asyncio.ensure_future(t.request(get()))
+    errors: list[BaseException] = []
+    task = spawn_capturing(t.request(get()), errors)
     await asyncio.sleep(0.2)
     await t.aclose()
-    with pytest.raises(sdk.CancelledError):
+    with pytest.raises(asyncio.CancelledError):
         await task
+    assert isinstance(errors[0], sdk.CancelledError)
 
 
 @pytest.mark.parametrize(

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import json
 import socket
 import threading
 import time
 from collections import defaultdict, deque
+from collections.abc import Awaitable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -119,3 +121,20 @@ def closed_port_url() -> str:
     port = sock.getsockname()[1]
     sock.close()
     return f"http://127.0.0.1:{port}"
+
+
+def spawn_capturing(awaitable: Awaitable[Any], sink: list[BaseException]) -> asyncio.Task[Any]:
+    """Run ``awaitable`` as a task and record the exception it raises *inside* the task.
+
+    On Python < 3.11 awaiting a cancelled task raises a fresh ``asyncio.CancelledError``, so the
+    SDK's ``CancelledError`` subclass is only observable from within the task itself.
+    """
+
+    async def run() -> Any:
+        try:
+            return await awaitable
+        except BaseException as exc:
+            sink.append(exc)
+            raise
+
+    return asyncio.ensure_future(run())
