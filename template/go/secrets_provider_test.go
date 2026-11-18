@@ -281,7 +281,9 @@ func (vanishing) PutSecret(context.Context, string, []byte, __PKG__.SetOptions) 
 	return "", nil
 }
 
-func (vanishing) RemoveSecret(context.Context, string, __PKG__.DeleteOptions) error { return nil }
+func (vanishing) RemoveSecret(context.Context, string, __PKG__.DeleteOptions) error {
+	return nil
+}
 
 func (vanishing) FetchMetadata(context.Context, string, __PKG__.GetOptions) (*__PKG__.SecretMetadata, error) {
 	return nil, nil
