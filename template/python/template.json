@@ -1,0 +1,18 @@
+{
+  "categories": {
+    "logging": [
+      "src/grow___KEY_SNAKE__/testing/memory_logs*.py",
+      "tests/test_logging*",
+      "integration/test_logging*"
+    ],
+    "tracing": [
+      "src/grow___KEY_SNAKE__/testing/memory_traces*.py",
+      "tests/test_tracing*",
+      "integration/test_tracing*"
+    ],
+    "secrets": [
+      "tests/test_secrets*",
+      "integration/test_secrets*"
+    ]
+  }
+}

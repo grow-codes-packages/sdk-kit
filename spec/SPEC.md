@@ -558,7 +558,7 @@ Format (`spec/schemas/scenario.schema.json`):
 Integration tests (real Docker service) run separately from the coverage gate and are not counted.
 
 **Licence allowlist (runtime dependencies):** Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC,
-Zlib, Unicode-3.0, Unicode-DFS-2016, 0BSD, CC0-1.0, MPL-2.0 (unmodified dependency only). Never GPL,
+Zlib, Unicode-3.0, Unicode-DFS-2016, 0BSD, CC0-1.0, PSF-2.0, MPL-2.0 (unmodified dependency only). Never GPL,
 LGPL, AGPL, SSPL, BUSL, EPL as a runtime dependency (EPL tools like JaCoCo are build-only).
 
 **Resource limits on the shared dev server** (agents): `CARGO_BUILD_JOBS=4`, Maven `-T 1`, Go
