@@ -123,9 +123,13 @@ jobs:
   demo-docs:
     needs: [typescript, rust, go, python, java]
     uses: ./.github/workflows/docs.yml
+    # A caller must grant every permission any job of the called workflow declares, even when
+    # that job (deploy) is skipped; otherwise the whole run fails at startup.
     permissions:
       contents: read
       actions: read
+      pages: write
+      id-token: write
     with:
       source-artifact: demo-source
       deploy: false
