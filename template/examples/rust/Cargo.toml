@@ -1,0 +1,13 @@
+# Created by sdk-kit __SDK_KIT_VERSION__; owned by this repository.
+[package]
+name = "grow-__KEY__-example"
+version = "0.0.0"
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+grow-__KEY__ = { path = "../../rust" }
+tokio = { version = "1.43", features = ["rt-multi-thread", "macros"] }
+
+[workspace]
