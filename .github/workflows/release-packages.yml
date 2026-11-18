@@ -211,9 +211,7 @@ jobs:
           persist-credentials: false
       - name: Set up Rust
         if: steps.gate.outputs.enabled == 'true'
-        uses: dtolnay/rust-toolchain@df2a88e9fe4098bad09cb42c3dec7187f15861fc # master (2026-11-15)
-        with:
-          toolchain: stable
+        run: rustup toolchain install stable --profile minimal && rustup default stable
       - name: crates.io token (trusted publishing)
         id: auth
         if: steps.gate.outputs.enabled == 'true' && inputs.crates-trusted-publishing
