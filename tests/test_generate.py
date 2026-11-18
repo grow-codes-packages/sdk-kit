@@ -286,7 +286,7 @@ def test_sync_custom_service_from_manifest(kit: Kit, tmp_path: Path) -> None:
 def test_sync_demo_and_explicit_service(kit: Kit, tmp_path: Path) -> None:
     dest = tmp_path / "demo"
     new(kit, DEMO, dest)
-    assert (dest / "demo" / "server.py").is_file()
+    assert (dest / "docker" / "demo" / "server.py").is_file()
     assert sync(kit, dest).unchanged
     dest2 = tmp_path / "alpha"
     new(kit, ALPHA, dest2)

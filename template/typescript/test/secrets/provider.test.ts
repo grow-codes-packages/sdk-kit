@@ -1,0 +1,212 @@
+import { describe, expect, it } from "vitest";
+import { ConflictError, NotFoundError, ValidationError } from "../../src/core/index.js";
+import {
+  BaseSecretsProvider,
+  type DeleteOptions,
+  type GetOptions,
+  type SecretMetadata,
+  SecretValue,
+  type SetOptions,
+  applyEnv,
+  envNameFor,
+  relativeName,
+} from "../../src/secrets/index.js";
+import { InMemorySecretsProvider } from "../../src/testing/secrets-memory.js";
+
+describe("BaseSecretsProvider (via InMemorySecretsProvider)", () => {
+  it("round-trips values and typed getters", async () => {
+    const p = new InMemorySecretsProvider();
+    expect(await p.set("a", "text")).toBe("1");
+    expect(await p.set("a", "text2")).toBe("2");
+    expect((await p.get("a"))?.reveal()).toBe("text2");
+    expect((await p.get("a", { version: "1" }))?.reveal()).toBe("text");
+    expect(await p.get("a", { version: "9" })).toBeNull();
+    expect(await p.getString("a")).toBe("text2");
+    await p.set("n", " 42.5 ");
+    expect(await p.getNumber("n")).toBe(42.5);
+    await p.set("empty", "  ");
+    await expect(p.getNumber("empty")).rejects.toBeInstanceOf(ValidationError);
+    await expect(p.getNumber("a")).rejects.toThrow("is not a number");
+    await p.set("b", "OFF");
+    expect(await p.getBool("b")).toBe(false);
+    await expect(p.getBool("a")).rejects.toBeInstanceOf(ValidationError);
+    await p.set("j", { x: [1] });
+    expect(await p.getJson("j")).toEqual({ x: [1] });
+    await expect(p.getJson("a")).rejects.toThrow("not valid JSON");
+    await p.set("bytes", new Uint8Array([1, 2]));
+    expect([...((await p.get("bytes"))?.revealBytes() ?? [])]).toEqual([1, 2]);
+    expect(await p.getString("missing")).toBeNull();
+    expect(await p.getJson("missing")).toBeNull();
+    expect(await p.getNumber("missing")).toBeNull();
+    expect(await p.getBool("missing")).toBeNull();
+    expect(await p.exists("a")).toBe(true);
+    expect(await p.exists("missing")).toBe(false);
+    expect((await p.require("a")).version).toBe("2");
+    await expect(p.require("missing")).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("getMany keeps request order, omits missing and de-duplicates", async () => {
+    const initial: Record<string, string> = {};
+    for (let i = 0; i < 20; i++) initial[`k${i}`] = `v${i}`;
+    const p = new InMemorySecretsProvider({ initial });
+    const names = ["k5", "nope", "k1", "k5", ...Array.from({ length: 20 }, (_, i) => `k${19 - i}`)];
+    const got = await p.getMany(names);
+    expect([...got.keys()].slice(0, 3)).toEqual(["k5", "k1", "k19"]);
+    expect(got.size).toBe(20);
+    expect((await p.getMany([])).size).toBe(0);
+  });
+
+  it("lists sorted, non-recursively, and getAll/loadEnv work on a path", async () => {
+    const p = new InMemorySecretsProvider({
+      initial: { "app/b": "2", "app/a-key": "1", "app/sub/c": "3", other: "x" },
+    });
+    const list = await p.list("app/");
+    expect(list.map((m) => m.name)).toEqual(["app/a-key", "app/b"]);
+    expect(list[0]?.path).toBe("app");
+    expect((await p.list()).map((m) => m.name)).toEqual(["other"]);
+    const all = await p.getAll("app/");
+    expect([...all.keys()]).toEqual(["app/a-key", "app/b"]);
+    const env: Record<string, string | undefined> = { APP_B: "keep" };
+    expect(await p.loadEnv("app/", { env, prefix: "APP_" })).toEqual({ APP_A_KEY: "app/a-key" });
+    expect(env).toEqual({ APP_B: "keep", APP_A_KEY: "1" });
+    expect(await p.loadEnv("app/", { env, prefix: "APP_", override: true })).toEqual({
+      APP_A_KEY: "app/a-key",
+      APP_B: "app/b",
+    });
+    expect(env.APP_B).toBe("2");
+  });
+
+  it("loadEnv with a mapping requires every secret", async () => {
+    const p = new InMemorySecretsProvider({ initial: { "db/pass": "pw" } });
+    const env: Record<string, string | undefined> = {};
+    expect(await p.loadEnv({ DB_PASSWORD: "db/pass" }, { env })).toEqual({
+      DB_PASSWORD: "db/pass",
+    });
+    expect(env.DB_PASSWORD).toBe("pw");
+    await expect(p.loadEnv({ X: "missing" }, { env })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("loadEnv defaults to process.env", async () => {
+    const p = new InMemorySecretsProvider({ initial: { "svc/token-x": "v" } });
+    try {
+      expect(
+        await p.loadEnv("svc", {
+          prefix: "GROW_TEST_LOADENV_",
+          signal: new AbortController().signal,
+        }),
+      ).toEqual({
+        GROW_TEST_LOADENV_TOKEN_X: "svc/token-x",
+      });
+      expect(process.env.GROW_TEST_LOADENV_TOKEN_X).toBe("v");
+    } finally {
+      delete process.env.GROW_TEST_LOADENV_TOKEN_X;
+    }
+  });
+
+  it("metadata, tags, cas and deletes", async () => {
+    let t = 0;
+    const p = new InMemorySecretsProvider({ now: () => new Date(++t * 1000) });
+    await p.set("s", "1", { tags: { team: "a" }, description: "desc", path: "root/" });
+    const meta = (await p.metadata("s", { path: "root" })) as SecretMetadata;
+    expect(meta).toMatchObject({
+      name: "root/s",
+      path: "root",
+      version: "1",
+      versions: 1,
+      tags: { team: "a" },
+      extra: { description: "desc" },
+    });
+    expect(meta.createdAt?.getTime()).toBe(1000);
+    expect(await p.metadata("missing")).toBeNull();
+    await expect(p.set("root/s", "2", { cas: 0 })).rejects.toBeInstanceOf(ConflictError);
+    expect(await p.set("root/s", "2", { cas: 1 })).toBe("2");
+    await p.delete("root/s", { versions: ["2"] });
+    expect((await p.get("root/s"))?.reveal()).toBe("1");
+    await p.delete("root/s", { versions: ["1", "7"] });
+    expect(await p.get("root/s")).toBeNull();
+    await expect(p.delete("root/s")).rejects.toBeInstanceOf(NotFoundError);
+
+    await p.set("soft", "a");
+    await p.delete("soft");
+    expect(await p.metadata("soft")).toBeNull();
+    expect((await p.list()).map((m) => m.name)).not.toContain("soft");
+    await expect(p.delete("soft")).rejects.toBeInstanceOf(NotFoundError);
+    expect(await p.set("soft", "b", { cas: 0 })).toBe("2");
+    await p.delete("soft", { permanent: true });
+    expect(p.size).toBe(0);
+    expect(p.calls.removeSecret).toBeGreaterThan(0);
+    expect(InMemorySecretsProvider.capabilities).toContain("write");
+  });
+
+  it("honours already-aborted signals", async () => {
+    const p = new InMemorySecretsProvider();
+    const signal = AbortSignal.abort();
+    for (const call of [
+      () => p.get("a", { signal }),
+      () => p.list(undefined, { signal }),
+      () => p.set("a", "b", { signal }),
+      () => p.delete("a", { signal }),
+      () => p.metadata("a", { signal }),
+    ]) {
+      await expect(call()).rejects.toMatchObject({ code: "CANCELLED" });
+    }
+  });
+
+  it("a minimal provider gets the whole interface", async () => {
+    class Tiny extends BaseSecretsProvider {
+      store = new Map<string, string>();
+      protected fetchSecret(name: string, _o: GetOptions): Promise<SecretValue | null> {
+        const v = this.store.get(name);
+        return Promise.resolve(v === undefined ? null : new SecretValue(v));
+      }
+      protected listSecrets(): Promise<SecretMetadata[]> {
+        return Promise.resolve(
+          [...this.store.keys()].reverse().map((name) => ({ name, tags: {}, extra: {} })),
+        );
+      }
+      protected putSecret(name: string, value: Uint8Array, _o: SetOptions): Promise<string> {
+        this.store.set(name, new TextDecoder().decode(value));
+        return Promise.resolve("");
+      }
+      protected removeSecret(name: string, _o: DeleteOptions): Promise<void> {
+        if (!this.store.delete(name)) return Promise.reject(new NotFoundError("x"));
+        return Promise.resolve();
+      }
+      protected fetchMetadata(name: string): Promise<SecretMetadata | null> {
+        return Promise.resolve(this.store.has(name) ? { name, tags: {}, extra: {} } : null);
+      }
+    }
+    const t = new Tiny();
+    expect(await t.set("b", "2")).toBe("");
+    await t.set("a", "1");
+    await t.set("a2", "1");
+    expect((await t.list()).map((m) => m.name)).toEqual(["a", "a2", "b"]);
+    await t.delete("b");
+    await expect(t.delete("b")).rejects.toBeInstanceOf(NotFoundError);
+    await t.close();
+  });
+});
+
+describe("env helpers", () => {
+  it("derives variable names", () => {
+    expect(envNameFor("db-password.v2")).toBe("DB_PASSWORD_V2");
+    expect(envNameFor("x", "P_")).toBe("P_X");
+    expect(relativeName("app/x", "app")).toBe("x");
+    expect(relativeName("app/x", "app/")).toBe("x");
+    expect(relativeName("x", undefined)).toBe("x");
+    expect(relativeName("x", "")).toBe("x");
+    expect(relativeName("other/x", "app")).toBe("other/x");
+    expect(relativeName("pre-x", "pre-")).toBe("x");
+  });
+
+  it("applyEnv keeps existing variables unless override", () => {
+    const env: Record<string, string | undefined> = { A: "old" };
+    const values = new Map<string, readonly [string, string]>([
+      ["A", ["a", "new"]],
+      ["B", ["b", "bv"]],
+    ]);
+    expect(applyEnv(values, env, false)).toEqual({ B: "b" });
+    expect(applyEnv(values, env, true)).toEqual({ A: "a", B: "b" });
+    expect(env).toEqual({ A: "new", B: "bv" });
+  });
+});

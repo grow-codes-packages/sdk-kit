@@ -1,0 +1,37 @@
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import {
+  type ConformanceOptions,
+  InMemorySecretsProvider,
+  conformanceCases,
+  formatReport,
+  runConformance,
+} from "../../src/testing/index.js";
+
+const scenariosDir = fileURLToPath(new URL("../../../conformance/scenarios/", import.meta.url));
+
+function options(): ConformanceOptions {
+  return {
+    scenariosDir,
+    categories: ["secrets"],
+    factories: { secrets: () => new InMemorySecretsProvider() },
+    capabilities: { secrets: [...InMemorySecretsProvider.capabilities] },
+  };
+}
+
+describe("conformance (secrets) against InMemorySecretsProvider", () => {
+  it("every secrets scenario passes and loadEnv variables are cleaned up", async () => {
+    const report = await runConformance(options());
+    expect(report.failed, formatReport(report)).toBe(0);
+    expect(report.skipped).toBe(0);
+    expect(report.passed).toBeGreaterThanOrEqual(4);
+    expect(report.results.map((r) => r.id)).toContain("secrets.roundtrip");
+    expect(Object.keys(process.env).some((k) => k.startsWith("GROWCONF_"))).toBe(false);
+  });
+
+  for (const c of conformanceCases(options())) {
+    it.skipIf(c.skip !== undefined)(`case ${c.id}`, async () => {
+      expect((await c.run()).status).toBe("passed");
+    });
+  }
+});

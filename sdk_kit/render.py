@@ -229,7 +229,7 @@ def sources_for(kit: Kit, service: Service) -> list[Source]:
     sources.append(Source(kit.conformance, "conformance", raw=True))
     sources.append(Source(kit.root / "spec" / "schemas", "conformance/schemas", raw=True))
     if service.key == "demo":
-        sources.append(Source(kit.demo, "demo", raw=True))
+        sources.append(Source(kit.demo, "docker/demo", raw=True))
     return [s for s in sources if s.root.is_dir()]
 
 
@@ -284,6 +284,8 @@ def render(
             generated = text is not None and is_generated_text(text)
             add(RenderedFile(out_path, data=data, mode=mode, generated=generated, source=source_name))
 
+    if service.key == "demo":
+        _apply_demo_overrides(files)
     if "AGENTS.md" in files:
         add(RenderedFile("CLAUDE.md", link="AGENTS.md", source="sdk-kit"))
     if "conformance/VERSION" not in files and kit.conformance.is_dir():
@@ -294,3 +296,23 @@ def render(
 def conformance_paths(files: Mapping[str, RenderedFile]) -> list[str]:
     """Rendered paths under ``conformance/`` (always overwritten by sync)."""
     return [path for path in files if path.startswith("conformance/")]
+
+
+# For the demo repo the sdk-kit demo server becomes the service under test: its compose file and
+# bootstrap script replace the template placeholders (harness contract, SPEC section 8), the server
+# itself is built from docker/demo/, and the demo server's own tests are not shipped.
+_DEMO_OVERRIDES = {
+    "docker/demo/compose.service.yml": "docker/compose.service.yml",
+    "docker/demo/bootstrap/bootstrap.sh": "docker/bootstrap/bootstrap.sh",
+}
+
+
+def _apply_demo_overrides(files: dict[str, RenderedFile]) -> None:
+    for src, dest in _DEMO_OVERRIDES.items():
+        item = files.pop(src, None)
+        if item is not None:
+            files[dest] = RenderedFile(
+                dest, data=item.data, mode=item.mode, generated=False, source=item.source
+            )
+    for path in [p for p in files if p.startswith("docker/demo/tests/") or "/__pycache__/" in p]:
+        del files[path]

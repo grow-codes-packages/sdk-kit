@@ -1,0 +1,6 @@
+{
+  "categories": {
+    "logging": ["src/testing/memory-logs.ts", "test/testing/memory-logs.test.ts"],
+    "tracing": ["src/testing/memory-traces.ts", "test/testing/memory-traces.test.ts"]
+  }
+}

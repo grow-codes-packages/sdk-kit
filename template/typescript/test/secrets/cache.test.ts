@@ -1,0 +1,173 @@
+import { describe, expect, it } from "vitest";
+import { ValidationError } from "../../src/core/index.js";
+import { SecretCache, type SecretsProvider } from "../../src/secrets/index.js";
+import { InMemorySecretsProvider } from "../../src/testing/secrets-memory.js";
+
+function setup(options: ConstructorParameters<typeof SecretCache>[1] = {}) {
+  let now = 0;
+  const inner = new InMemorySecretsProvider({ initial: { a: "1", b: "2", c: "3" } });
+  const cache = new SecretCache(inner, { clock: () => now, ...options });
+  return {
+    inner,
+    cache,
+    advance: (ms: number) => {
+      now += ms;
+    },
+    fetches: () => inner.calls.fetchSecret ?? 0,
+  };
+}
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe("SecretCache", () => {
+  it("caches hits, misses and negative results within the TTL", async () => {
+    const { cache, fetches, advance } = setup({ ttlMs: 1000, refreshAheadFactor: 1 });
+    expect((await cache.get("a"))?.reveal()).toBe("1");
+    expect(await cache.getString("a")).toBe("1");
+    expect(await cache.exists("a")).toBe(true);
+    expect(await cache.get("missing")).toBeNull();
+    expect(await cache.exists("missing")).toBe(false);
+    expect(fetches()).toBe(2);
+    expect(cache.stats()).toEqual({ hits: 3, misses: 2, evictions: 0, refreshes: 0, size: 2 });
+    advance(1000);
+    await cache.get("a");
+    expect(fetches()).toBe(3);
+    expect(cache.provider).toBeDefined();
+  });
+
+  it("keys by version and path", async () => {
+    const { cache, inner, fetches } = setup();
+    await inner.set("a", "1b");
+    expect((await cache.get("a", { version: "1" }))?.reveal()).toBe("1");
+    expect((await cache.get("a"))?.reveal()).toBe("1b");
+    expect(await cache.get("a", { path: "x" })).toBeNull();
+    expect(fetches()).toBe(3);
+  });
+
+  it("evicts least recently used entries", async () => {
+    const { cache } = setup({ maxEntries: 2 });
+    await cache.get("a");
+    await cache.get("b");
+    await cache.get("a");
+    await cache.get("c");
+    expect(cache.stats().evictions).toBe(1);
+    expect(cache.stats().size).toBe(2);
+    const before = cache.stats().misses;
+    await cache.get("a");
+    expect(cache.stats().misses).toBe(before);
+    await cache.get("b");
+    expect(cache.stats().misses).toBe(before + 1);
+  });
+
+  it("refreshes ahead once after ttl * factor", async () => {
+    const { cache, inner, advance, fetches } = setup({ ttlMs: 1000, refreshAheadFactor: 0.5 });
+    await cache.get("a");
+    await inner.set("a", "new");
+    advance(400);
+    expect((await cache.get("a"))?.reveal()).toBe("1");
+    expect(cache.stats().refreshes).toBe(0);
+    advance(200);
+    expect((await cache.get("a"))?.reveal()).toBe("1");
+    await flush();
+    expect(cache.stats().refreshes).toBe(1);
+    expect(fetches()).toBe(2);
+    expect((await cache.get("a"))?.reveal()).toBe("new");
+    expect(cache.stats().refreshes).toBe(1);
+  });
+
+  it("serves stale values while revalidating", async () => {
+    const { cache, inner, advance } = setup({
+      ttlMs: 100,
+      refreshAheadFactor: 1,
+      staleWhileRevalidateMs: 100,
+    });
+    await cache.get("a");
+    await inner.set("a", "fresh");
+    advance(150);
+    expect((await cache.get("a"))?.reveal()).toBe("1");
+    await flush();
+    expect((await cache.get("a"))?.reveal()).toBe("fresh");
+    advance(500);
+    await inner.set("a", "later");
+    expect((await cache.get("a"))?.reveal()).toBe("later");
+  });
+
+  it("reports background refresh failures and keeps the entry", async () => {
+    const errors: unknown[] = [];
+    let fail = false;
+    const inner = new InMemorySecretsProvider({ initial: { a: "1" } });
+    const flaky: SecretsProvider = Object.assign(Object.create(inner) as SecretsProvider, {
+      get: (name: string) => (fail ? Promise.reject(new Error("down")) : inner.get(name)),
+    });
+    let now = 0;
+    const cache = new SecretCache(flaky, {
+      ttlMs: 100,
+      clock: () => now,
+      onRefreshError: (e) => {
+        errors.push(e);
+        throw new Error("ignored");
+      },
+    });
+    await cache.get("a");
+    fail = true;
+    now = 90;
+    expect((await cache.get("a"))?.reveal()).toBe("1");
+    await flush();
+    expect(errors).toHaveLength(1);
+    expect((await cache.get("a"))?.reveal()).toBe("1");
+    await flush();
+    expect(errors).toHaveLength(2);
+    const silent = new SecretCache(flaky, { ttlMs: 100, clock: () => now });
+    fail = false;
+    await silent.get("a");
+    fail = true;
+    now = 300;
+    await expect(silent.get("a")).rejects.toThrow("down");
+    now = 185;
+  });
+
+  it("de-duplicates concurrent loads", async () => {
+    const { cache, fetches } = setup();
+    const [x, y] = await Promise.all([cache.get("a"), cache.get("a")]);
+    expect(x?.reveal()).toBe("1");
+    expect(y?.reveal()).toBe("1");
+    expect(fetches()).toBe(1);
+  });
+
+  it("writes pass through and invalidate", async () => {
+    const { cache, inner } = setup();
+    await cache.get("a");
+    expect(await cache.set("a", "2")).toBe("2");
+    expect((await cache.get("a"))?.reveal()).toBe("2");
+    await cache.delete("a");
+    expect(await cache.get("a")).toBeNull();
+    expect(await inner.get("a")).toBeNull();
+    await expect(cache.delete("a")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect((await cache.list()).map((m) => m.name)).toEqual(["b", "c"]);
+    expect((await cache.metadata("b"))?.name).toBe("b");
+    expect((await cache.getMany(["b", "c", "zz"])).size).toBe(2);
+    expect((await cache.getAll()).size).toBe(2);
+  });
+
+  it("invalidate during an in-flight load does not store the stale result", async () => {
+    const { cache, inner } = setup();
+    const pending = cache.get("a");
+    cache.invalidate("a");
+    await inner.set("a", "v2");
+    expect((await pending)?.reveal()).toBe("1");
+    expect((await cache.get("a"))?.reveal()).toBe("v2");
+    const p2 = cache.get("b");
+    cache.clear();
+    await p2;
+    expect(cache.stats().size).toBe(0);
+  });
+
+  it("validates options", () => {
+    const inner = new InMemorySecretsProvider();
+    expect(() => new SecretCache(inner, { ttlMs: 0 })).toThrow(ValidationError);
+    expect(() => new SecretCache(inner, { maxEntries: 0 })).toThrow(ValidationError);
+    expect(() => new SecretCache(inner, { refreshAheadFactor: 0 })).toThrow(ValidationError);
+    expect(() => new SecretCache(inner, { staleWhileRevalidateMs: -1 })).toThrow(ValidationError);
+    expect(new SecretCache(inner).stats().size).toBe(0);
+  });
+});

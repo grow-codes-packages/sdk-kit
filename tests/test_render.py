@@ -187,7 +187,7 @@ def test_render_stub_kit_secrets_only(kit: Kit) -> None:
     assert "conformance/scenarios/secrets.roundtrip.json" in paths
     assert "conformance/scenarios/logging.batch.json" not in paths
     assert "conformance/scenarios/core.health.json" in paths
-    assert "demo/server.py" not in paths
+    assert "docker/demo/server.py" not in paths
     lib = files["rust/src/lib.rs"].data.decode()
     assert "mod secrets; // alphasecrets" in lib
     assert "telemetry" not in lib and "tracing" not in lib and "@sdk-kit" not in lib
@@ -214,7 +214,7 @@ def test_render_modes_binary_raw_and_flags(kit: Kit) -> None:
     assert files["rust/assets/icon.png"].data == PNG  # binary: tokens untouched
     assert files["docs/logo.png"].data == PNG
     assert files["conformance/core-unit.md"].data == b"# core unit __KEY__ stays raw\n"
-    assert files["demo/server.py"].data == b"# demo server __KEY__ stays raw\n"
+    assert files["docker/demo/server.py"].data == b"# demo server __KEY__ stays raw\n"
     assert files["docker/Dockerfile.go"].generated
     assert files["examples/python/quickstart.py"].data == b"// example for DemoClient\n"
     header = files["go/src/core/errors.go"].data.decode().splitlines()[0]
@@ -271,8 +271,8 @@ def test_render_without_agents_or_conformance(tmp_path: Path) -> None:
 
 def test_sources_for(kit: Kit) -> None:
     dests = [s.dest for s in sources_for(kit, DEMO)]
-    assert dests[0] == "" and "demo" in dests and "conformance" in dests
-    assert "demo" not in [s.dest for s in sources_for(kit, ALPHA)]
+    assert dests[0] == "" and "docker/demo" in dests and "conformance" in dests
+    assert "docker/demo" not in [s.dest for s in sources_for(kit, ALPHA)]
 
 
 def test_kit_locate(tmp_path: Path) -> None:
@@ -283,3 +283,26 @@ def test_kit_locate(tmp_path: Path) -> None:
     assert k.services == tmp_path / "spec" / "services.json"
     assert k.demo == tmp_path / "demo"
     assert k.conformance == tmp_path / "conformance"
+
+
+def test_demo_overrides(tmp_path: Path) -> None:
+    from sdk_kit.render import RenderedFile, _apply_demo_overrides
+
+    files = {
+        "docker/demo/compose.service.yml": RenderedFile("docker/demo/compose.service.yml", data=b"demo"),
+        "docker/demo/bootstrap/bootstrap.sh": RenderedFile(
+            "docker/demo/bootstrap/bootstrap.sh", data=b"sh", mode=0o755
+        ),
+        "docker/demo/tests/test_server.py": RenderedFile("docker/demo/tests/test_server.py"),
+        "docker/demo/__pycache__/x.pyc": RenderedFile("docker/demo/__pycache__/x.pyc"),
+        "docker/demo/server.py": RenderedFile("docker/demo/server.py", data=b"srv"),
+    }
+    _apply_demo_overrides(files)
+    assert files["docker/compose.service.yml"].data == b"demo"
+    assert files["docker/bootstrap/bootstrap.sh"].mode == 0o755
+    assert sorted(files) == [
+        "docker/bootstrap/bootstrap.sh",
+        "docker/compose.service.yml",
+        "docker/demo/server.py",
+    ]
+    _apply_demo_overrides({})  # nothing to override is fine
