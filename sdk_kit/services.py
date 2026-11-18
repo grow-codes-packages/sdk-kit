@@ -173,6 +173,8 @@ DEMO = Service(
     vendor="Grow Codes",
     upstream_license="Apache-2.0 (sdk-kit demo server)",
     env="`GROW_DEMO_*`",
+    key_snake="demo",
+    key_upper="DEMO",
 )
 
 
