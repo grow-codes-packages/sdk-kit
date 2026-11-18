@@ -1,0 +1,17 @@
+# sdk-kit checkout
+/.venv/
+/build/
+/.coverage
+/.coverage.*
+/coverage.json
+/htmlcov/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+/dist/
+.DS_Store
+.idea/
+.vscode/
