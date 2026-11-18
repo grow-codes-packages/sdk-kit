@@ -5,8 +5,6 @@ package testkit
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,47 +16,50 @@ import (
 
 const scenariosDir = "../../conformance/scenarios"
 
-// demoServer mimics the sdk-kit demo server (health, ping, version).
-func demoServer(t *testing.T) *httptest.Server {
-	t.Helper()
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/health":
-			_, _ = w.Write([]byte(`{"status":"ok"}`))
-		case "/v1/ping":
-			if r.Header.Get("Authorization") != "Bearer demo-token" {
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-			_, _ = w.Write([]byte(`{"pong":true}`))
-		case "/version":
-			_, _ = w.Write([]byte(`{"version":"1.0.0"}`))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(ts.Close)
-	return ts
+// fakeCore is an in-memory CoreTarget, so these generated tests do not depend on the service
+// client's real routes (services replace the skeleton client freely).
+type fakeCore struct {
+	err    error
+	closed int
 }
 
-func coreFactory(url string) Factory {
-	return CoreFactory(func(context.Context) (CoreTarget, error) {
-		return __PKG__.NewClient(__PKG__.Config{CommonConfig: __PKG__.CommonConfig{URL: url}, Token: __PKG__.NewSecret("demo-token")})
-	})
+func (f *fakeCore) Health(context.Context) (__PKG__.HealthStatus, error) {
+	if f.err != nil {
+		return __PKG__.HealthStatus{}, f.err
+	}
+	return __PKG__.HealthStatus{Healthy: true, Status: "ok", Details: map[string]string{}}, nil
+}
+
+func (f *fakeCore) Ping(context.Context) (time.Duration, error) {
+	if f.err != nil {
+		return 0, f.err
+	}
+	return time.Millisecond, nil
+}
+
+func (f *fakeCore) ServerVersion(context.Context) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return "1.0.0", nil
+}
+
+func (f *fakeCore) Close() error { f.closed++; return nil }
+
+func coreFactory() Factory {
+	return CoreFactory(func(context.Context) (CoreTarget, error) { return &fakeCore{}, nil })
 }
 
 func TestConformanceCore(t *testing.T) {
-	ts := demoServer(t)
 	Run(t, scenariosDir, Options{
 		Categories:   []string{"core"},
 		Capabilities: []string{"version"},
-		Factories:    Factories{"core": coreFactory(ts.URL)},
+		Factories:    Factories{"core": coreFactory()},
 	})
 }
 
 func TestRunScenariosReport(t *testing.T) {
-	ts := demoServer(t)
-	rep, err := RunScenarios(t.Context(), scenariosDir, Options{Factories: Factories{"core": coreFactory(ts.URL)}})
+	rep, err := RunScenarios(t.Context(), scenariosDir, Options{Factories: Factories{"core": coreFactory()}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,13 +94,12 @@ func TestCoreOpsErrors(t *testing.T) {
 			t.Fatalf("%s with wrong target", op)
 		}
 	}
-	c, err := __PKG__.NewClient(__PKG__.Config{CommonConfig: __PKG__.CommonConfig{URL: "http://127.0.0.1:1", Retry: &__PKG__.RetryPolicy{}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	h, _ := lookupOp("core", "ping")
-	if _, err := h(t.Context(), &Env{Target: c}, nil); err == nil {
-		t.Fatal("ping against a closed port")
+	failing := &fakeCore{err: errors.New("unreachable")}
+	for _, op := range []string{"health", "ping", "serverVersion"} {
+		h, _ := lookupOp("core", op)
+		if _, err := h(t.Context(), &Env{Target: failing}, nil); err == nil {
+			t.Fatalf("%s against a failing target", op)
+		}
 	}
 }
 
