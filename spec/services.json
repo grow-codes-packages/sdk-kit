@@ -245,7 +245,7 @@
       "logging"
     ],
     "image": "local intake stub (contract-verified) + optional live Better Stack source",
-    "port": 80,
+    "port": 8080,
     "upstreamLicense": "Proprietary SaaS",
     "vendor": "Better Stack, Inc.",
     "env": "`BETTERSTACK_SOURCE_TOKEN`, `BETTERSTACK_INGESTING_HOST`, `BETTERSTACK_QUERY_HOST`, `BETTERSTACK_QUERY_USERNAME`/`PASSWORD` (SQL API), `GROW_BETTER_STACK_LOGS_*`",

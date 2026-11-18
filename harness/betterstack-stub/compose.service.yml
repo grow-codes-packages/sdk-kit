@@ -1,0 +1,48 @@
+# docker/compose.service.yml for `better-stack-logs`: the contract-verified Better Stack stub from
+# sdk-kit/harness/betterstack-stub (copied to docker/betterstack-stub/). Better Stack is SaaS-only;
+# an optional live check against a real source runs outside Docker (see docs/compatibility.md).
+#   service:8080  ingest host  (POST /, Bearer source token)
+#   service:8123  query host   (ClickHouse HTTP SQL API, basic auth)
+# OWNED BY THIS REPOSITORY after generation (see docker/compose.yml for the harness contract).
+
+services:
+  service:
+    image: grow-sdk-betterstack-stub:local
+    build:
+      context: betterstack-stub
+    networks:
+      default:
+        aliases: [better-stack-logs]
+    environment:
+      BETTERSTACK_STUB_SOURCES: stub-source-token=t1_grow_conformance
+      BETTERSTACK_STUB_QUERY_USER: stub-user
+      BETTERSTACK_STUB_QUERY_PASSWORD: stub-password
+    healthcheck:
+      test: ["CMD", "python", "/app/stub.py", "--healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 500ms
+
+  bootstrap:
+    image: alpine:3.24.4
+    depends_on:
+      service:
+        condition: service_healthy
+    volumes:
+      - bootstrap:/bootstrap
+      - ./bootstrap:/scripts:ro
+      - ./harness:/harness:ro
+    environment:
+      INGEST_URL: http://service:8080
+      QUERY_URL: http://service:8123
+      SOURCE_TOKEN: stub-source-token
+      SOURCE_TABLE: t1_grow_conformance
+      QUERY_USER: stub-user
+      QUERY_PASSWORD: stub-password
+    entrypoint: ["/bin/sh", "/scripts/bootstrap.sh"]
+    restart: "no"
+
+volumes:
+  bootstrap: {}

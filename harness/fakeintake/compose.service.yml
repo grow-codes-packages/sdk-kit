@@ -1,0 +1,40 @@
+# docker/compose.service.yml for `datadog-logs`: Datadog's own fake intake (sdk-kit/harness/fakeintake).
+# It accepts POSTs on any intake path (logs: /api/v2/logs) and stores the payloads for inspection via
+# GET /fakeintake/payloads?endpoint=<path>. The bootstrap job makes /api/v2/logs answer 202 like the
+# real Logs intake (fakeintake answers 200 by default) and writes DD_API_KEY + FAKEINTAKE_URL.
+# `datadog-apm` adds a `datadog/agent` container (OTLP receiver) that forwards to this fakeintake
+# (see sdk-kit/harness/fakeintake/README.md).
+# OWNED BY THIS REPOSITORY after generation (see docker/compose.yml for the harness contract).
+
+services:
+  service:
+    image: datadog/fakeintake:v74@sha256:d84716ff38703cefa7fb5b822cfcd421d18822e8a85606466af771969289963e
+    command: ["-port", "80", "-retention-period", "30m"]
+    networks:
+      default:
+        aliases: [fakeintake]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:80/fakeintake/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+      start_interval: 500ms
+
+  bootstrap:
+    image: alpine:3.24.4
+    depends_on:
+      service:
+        condition: service_healthy
+    volumes:
+      - bootstrap:/bootstrap
+      - ./bootstrap:/scripts:ro
+      - ./harness:/harness:ro
+    environment:
+      FAKEINTAKE_URL: http://service:80
+      DD_API_KEY: fakeintake-api-key-0000000000000000
+    entrypoint: ["/bin/sh", "/scripts/bootstrap.sh"]
+    restart: "no"
+
+volumes:
+  bootstrap: {}

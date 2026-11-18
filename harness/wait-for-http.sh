@@ -1,0 +1,1 @@
+../template/common/docker/harness/wait-for-http.sh
