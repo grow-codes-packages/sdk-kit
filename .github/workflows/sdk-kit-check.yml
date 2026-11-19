@@ -56,13 +56,21 @@ jobs:
         run: tar -xf "$RUNNER_TEMP/source/source.tar" -C "$GITHUB_WORKSPACE"
 
       - name: Check out sdk-kit
+        id: kit
+        # While the repositories are private, a caller's GITHUB_TOKEN cannot read sdk-kit: skip with
+        # a notice instead of failing (the check runs again once the repositories are public).
+        continue-on-error: true
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: grow-codes-packages/sdk-kit
           ref: ${{ inputs.sdk-kit-ref }}
           path: .sdk-kit-checkout
           persist-credentials: false
+      - name: sdk-kit not readable (private)
+        if: steps.kit.outcome != 'success'
+        run: echo "::notice title=sdk-kit check::skipped — grow-codes-packages/sdk-kit is not readable with this token (private repository)"
       - name: Move sdk-kit out of the repo tree
+        if: steps.kit.outcome == 'success'
         run: mv .sdk-kit-checkout "$RUNNER_TEMP/sdk-kit"
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -70,11 +78,12 @@ jobs:
           python-version: "3.13"
 
       - name: sdk-kit check
+        if: steps.kit.outcome == 'success'
         run: |
           "$RUNNER_TEMP/sdk-kit/bin/sdk-kit" --version
           "$RUNNER_TEMP/sdk-kit/bin/sdk-kit" check --dest "$WD"
       - name: sdk-kit sync --dry-run (report only)
-        if: always()
+        if: always() && steps.kit.outcome == 'success'
         env:
           SDK_KIT_REF: ${{ inputs.sdk-kit-ref }}
         run: |
