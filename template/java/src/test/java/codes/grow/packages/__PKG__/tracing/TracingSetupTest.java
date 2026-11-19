@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import codes.grow.packages.__PKG__.core.ConfigException;
+import codes.grow.packages.__PKG__.core.QuietJul;
 import codes.grow.packages.__PKG__.core.TimeoutException;
 import codes.grow.packages.__PKG__.core.TlsOptions;
 import codes.grow.packages.__PKG__.testing.tracing.InMemorySpanExporter;
@@ -277,6 +278,8 @@ class TracingSetupTest {
 
   @Test
   void forceFlushFailureIsATimeout() {
+    // the SDK may warn about the stuck exporter; QuietJul keeps the silenced logger reachable
+    QuietJul.silence("io.opentelemetry");
     SpanExporter stuck =
         new SpanExporter() {
           @Override

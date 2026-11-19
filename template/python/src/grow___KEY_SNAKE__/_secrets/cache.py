@@ -127,6 +127,8 @@ class SecretCache(BaseSecretsProvider):
       returned while one refresh runs.
     * LRU eviction beyond ``max_entries``. ``clock`` (monotonic seconds) is injectable;
       ``spawn`` runs background refreshes (default: a daemon thread).
+    * :meth:`close` makes later calls raise :class:`CancelledError` ("client is closed"); it
+      does not close the wrapped provider.
     """
 
     def __init__(
@@ -209,6 +211,7 @@ class SecretCache(BaseSecretsProvider):
         path: str | None = None,
     ) -> WatchHandle:
         """Watches the underlying provider directly (bypasses the cache)."""
+        self.ensure_open("secrets.watch")
         return self._provider.watch(
             name, interval_s, on_change, on_error=on_error, version=version, path=path
         )
@@ -311,6 +314,7 @@ class AsyncSecretCache(AsyncBaseSecretsProvider):
         path: str | None = None,
     ) -> AsyncWatchHandle:
         """Watches the underlying provider directly (bypasses the cache)."""
+        self.ensure_open("secrets.watch")
         return self._provider.watch(
             name, interval_s, on_change, on_error=on_error, version=version, path=path
         )

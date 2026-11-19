@@ -14,6 +14,6 @@
 // sentinels (errors.Is(err, __PKG__.ErrNotFound)). Credentials are wrapped in
 // Secret and never appear in errors, hooks or logs.
 //
-// __DISPLAY__ is a trademark of __VENDOR__. This package is not affiliated
-// with or endorsed by __VENDOR__.
+// __DISPLAY__ is a trademark of its owner (__VENDOR__); this package is not
+// affiliated with or endorsed by it.
 package __PKG__

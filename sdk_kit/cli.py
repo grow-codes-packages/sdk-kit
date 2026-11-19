@@ -101,16 +101,19 @@ def _cmd_sync(kit: Kit, args: argparse.Namespace, out: TextIO) -> int:
         (f"{prefix}update", report.updated),
         (f"{prefix}create", report.created),
         (f"{prefix}remove", report.removed),
+        (f"{prefix}adopt (unedited service copy, now generated)", report.adopted),
         ("kept (header removed, now service-owned)", report.owned),
         ("SKIPPED (locally modified; --force overwrites)", report.modified),
+        ("SKIPPED (keep region with content no longer in the template; --force drops it)", report.dropped),
     )
     for title, paths in sections:
         for path in paths:
             out.write(f"{title}: {path}\n")
+    updated = len(report.updated) + len(report.adopted)
     out.write(
-        f"sync {'(dry run) ' if args.dry_run else ''}done: {len(report.updated)} updated, "
+        f"sync {'(dry run) ' if args.dry_run else ''}done: {updated} updated, "
         f"{len(report.created)} created, {len(report.removed)} removed, "
-        f"{len(report.unchanged)} unchanged, {len(report.modified)} skipped\n"
+        f"{len(report.unchanged)} unchanged, {len(report.modified) + len(report.dropped)} skipped\n"
     )
     return 1 if report.conflicts else 0
 

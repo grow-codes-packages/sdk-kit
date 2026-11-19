@@ -35,7 +35,7 @@ type RetryPolicy struct {
 	// MaxRetryAfter is the longest server-requested wait honoured.
 	MaxRetryAfter time.Duration
 	// Rand returns a number in [0, 1); nil uses math/rand/v2. Inject it in tests.
-	Rand func() float64
+	Rand func() float64 `json:"-"`
 }
 
 // DefaultRetryPolicy returns the default policy.

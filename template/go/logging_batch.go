@@ -70,9 +70,9 @@ type BatchOptions struct {
 	// (default 200 ms).
 	RetryBackoff time.Duration
 	// OnDrop is called with records that will never be exported. It must not block.
-	OnDrop func(records []LogRecord, reason DropReason)
+	OnDrop func(records []LogRecord, reason DropReason) `json:"-"`
 	// OnError is called when an export fails or the backend rejects records.
-	OnError func(err error, records []LogRecord)
+	OnError func(err error, records []LogRecord) `json:"-"`
 }
 
 func (o BatchOptions) withDefaults() BatchOptions {

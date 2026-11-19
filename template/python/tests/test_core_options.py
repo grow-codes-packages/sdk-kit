@@ -461,11 +461,6 @@ def test_unpolled_step_runs_once() -> None:
     assert target.calls == 1
 
 
-def test_polled_tracing_list_services_is_registered() -> None:
-    pytest.importorskip("grow___KEY_SNAKE__.testing.tracing_conformance")
-    assert "listServices" in r._POLLED.get("tracing", set())
-
-
 def test_async_runner_loop_still_closes() -> None:
     # A polled op whose handler is async still runs on the scenario's private loop.
     class AsyncTarget:

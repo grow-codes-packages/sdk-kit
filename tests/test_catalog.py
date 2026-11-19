@@ -183,3 +183,57 @@ def test_release_config_check_on_generated_repo(tmp_path: Path) -> None:
     ):
         assert needle in result.stderr, needle
     assert run_release_check(dest, "go").returncode == 1
+
+
+FAKE_NPM = """#!/bin/sh
+case "$1" in
+  pack) mkdir -p dist && : > dist/pkg-0.1.0.tgz ;;
+  publish)
+    case "$FAKE_PUBLISH" in
+      ok) echo "+ pkg@0.1.0" ;;
+      published)
+        echo "npm notice Publishing to https://registry.npmjs.org/ with tag latest"
+        echo "npm error You cannot publish over the previously published versions: 0.1.0." >&2
+        exit 1 ;;
+      *) echo "npm error 403 Forbidden" >&2; exit 1 ;;
+    esac ;;
+esac
+"""
+
+
+def test_typescript_release_check_tolerates_an_already_published_version(tmp_path: Path) -> None:
+    """`make release-check` (TypeScript) passes when the dry run fails only because the version is on npm."""
+    kit = locate()
+    if not (kit.template / "typescript" / "Makefile").is_file():
+        pytest.skip("typescript template not written yet")
+    makefile = render(kit, DEMO)["typescript/Makefile"].data.decode("utf-8")
+    assert 'grep -q "cannot publish over the previously published version"' in makefile
+    assert "already on npm (expected between releases)" in makefile
+
+    dest = tmp_path / "demo"
+    new(kit, DEMO, dest)
+    npm = tmp_path / "npm"
+    npm.write_text(FAKE_NPM, encoding="utf-8")
+    npm.chmod(0o755)
+
+    def release_check(mode: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["make", "-s", "release-check", f"NPM={npm}", "RELEASE_CHECK=true"],
+            cwd=dest / "typescript",
+            capture_output=True,
+            text=True,
+            check=False,
+            env={"PATH": "/usr/bin:/bin", "FAKE_PUBLISH": mode},
+        )
+
+    ok = release_check("ok")
+    assert ok.returncode == 0, ok.stdout + ok.stderr
+    assert "+ pkg@0.1.0" in ok.stdout
+    published = release_check("published")
+    assert published.returncode == 0, published.stdout + published.stderr
+    assert "already on npm (expected between releases)" in published.stdout
+    assert "npm notice Publishing" in published.stdout
+    assert "npm error" not in published.stdout
+    failed = release_check("forbidden")
+    assert failed.returncode != 0
+    assert "npm error 403 Forbidden" in failed.stdout

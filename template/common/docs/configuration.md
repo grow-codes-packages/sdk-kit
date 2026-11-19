@@ -4,15 +4,28 @@
 
 `__SERVICE__Config` holds every setting of a client. It is **immutable** after construction,
 validated when it is built (invalid values raise a `CONFIG` error) and its string/debug form
-**redacts every credential**. Service-specific fields (for example `token`) are listed on the
-[Functions](functions.md) page.
+**redacts every credential**. The settings of __DISPLAY__ itself (endpoint, credentials and other
+service fields) are listed under [Service settings](#service-settings); the settings every Grow
+Codes SDK shares follow under [Common settings](#common-settings).
 
-## Common settings
+## Service settings
+
+<!-- @sdk-kit:keep service-settings — service-owned: endpoint, credentials, service fields; kept by "sdk-kit sync" -->
 
 | Setting | Default | Environment variable |
 | - | - | - |
 | `url` — endpoint base URL | `http://127.0.0.1:__PORT__` | `GROW___KEY_UPPER___URL` |
 | `token` — API token (secret) | none | `GROW___KEY_UPPER___TOKEN` |
+
+The vendor variables of __DISPLAY__ and further service fields are listed on the
+[Functions](functions.md) page.
+
+<!-- @sdk-kit:endkeep -->
+
+## Common settings
+
+| Setting | Default | Environment variable |
+| - | - | - |
 | `connectTimeout` — connection setup | 10 s | `GROW___KEY_UPPER___CONNECT_TIMEOUT` |
 | `requestTimeout` — per attempt (headers + body) | 30 s | `GROW___KEY_UPPER___REQUEST_TIMEOUT` |
 | `totalTimeout` — whole call incl. retries and backoff | 120 s | `GROW___KEY_UPPER___TOTAL_TIMEOUT` |
@@ -44,6 +57,8 @@ Parsing rules:
 - **Booleans** accept `true/false`, `1/0`, `yes/no`, `on/off` (any case).
 - An **empty** variable counts as unset.
 - A present but **invalid** value raises a `CONFIG` error that names the variable, never its value.
+
+<!-- @sdk-kit:keep examples — service-owned: configuration examples per language; kept by "sdk-kit sync" -->
 
 === "TypeScript"
 
@@ -192,6 +207,8 @@ Parsing rules:
     __SERVICE__Client custom = __SERVICE__Client.create(config);
     System.out.println(config); // token shown as [REDACTED]
     ```
+
+<!-- @sdk-kit:endkeep -->
 
 ## Retry policy
 

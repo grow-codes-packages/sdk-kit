@@ -7,8 +7,9 @@ import os
 import re
 from pathlib import Path
 
+from sdk_kit import keep
 from sdk_kit.generate import MANIFEST
-from sdk_kit.render import GENERATED_MARKER, IGNORED_NAMES, decode_text, token_pattern
+from sdk_kit.render import GENERATED_MARKER, IGNORED_NAMES, decode_text, is_generated_text, token_pattern
 from sdk_kit.services import LANGS
 
 GROW_CODES_BADGE = (
@@ -49,7 +50,13 @@ def _leftover_tokens(dest: Path) -> list[str]:
     problems = []
     for dirpath, dirnames, filenames in os.walk(dest):
         top = Path(dirpath) == dest
-        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_SCAN and not (top and d in RAW_DIRS))
+        dirnames[:] = sorted(
+            d
+            for d in dirnames
+            if d not in SKIP_SCAN
+            and not (top and d in RAW_DIRS)
+            and not (Path(dirpath) / d / "pyvenv.cfg").is_file()  # any virtualenv (build/license-venv, ...)
+        )
         for name in sorted(filenames):
             path = Path(dirpath) / name
             if path.is_symlink() or not path.is_file():
@@ -66,6 +73,23 @@ def _leftover_tokens(dest: Path) -> list[str]:
     return problems
 
 
+def _keep_problems(dest: Path, paths: list[str]) -> list[str]:
+    """Malformed ``@sdk-kit:keep`` markers in generated files (sync could not keep their regions)."""
+    problems = []
+    for rel in sorted(paths):
+        path = dest / rel
+        if path.is_symlink() or not path.is_file():
+            continue
+        text = decode_text(path.read_bytes())
+        if text is None or "@sdk-kit:" not in text or not is_generated_text(text):
+            continue
+        try:
+            keep.parse(text, rel)
+        except keep.KeepError as exc:
+            problems.append(str(exc))
+    return problems
+
+
 def check(dest: Path, key: str | None = None) -> list[str]:
     """Return the list of problems (empty when the repository is fine)."""
     if not dest.is_dir():
@@ -76,7 +100,13 @@ def check(dest: Path, key: str | None = None) -> list[str]:
         try:
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
             key = key or str(data["key"])
-        except (json.JSONDecodeError, KeyError, TypeError):
+            generated = [
+                str(e["path"])
+                for e in data.get("generatedFiles", [])
+                if isinstance(e, dict) and e.get("generated") and isinstance(e.get("path"), str)
+            ]
+            problems += _keep_problems(dest, generated)
+        except (json.JSONDecodeError, KeyError, TypeError, AttributeError):
             problems.append(f"{MANIFEST}: not a valid sdk-kit manifest")
     else:
         problems.append(f"{MANIFEST} missing")

@@ -2,7 +2,7 @@
 
 import { throwIfAborted } from "../core/abort.js";
 import { parseBool } from "../core/env.js";
-import { NotFoundError, ValidationError } from "../core/errors.js";
+import { CancelledError, NotFoundError, ValidationError } from "../core/errors.js";
 import { applyEnv, envNameFor, relativeName } from "./env.js";
 import type {
   DeleteOptions,
@@ -29,6 +29,7 @@ export const GET_MANY_CONCURRENCY = 8;
  */
 export abstract class BaseSecretsProvider implements SecretsProvider {
   readonly #watchers = new Set<WatchHandle>();
+  #closed = false;
 
   /** Reads a secret; `null` when missing. */
   protected abstract fetchSecret(name: string, options: GetOptions): Promise<SecretValue | null>;
@@ -52,6 +53,7 @@ export abstract class BaseSecretsProvider implements SecretsProvider {
   ): Promise<SecretMetadata | null>;
 
   async get(name: string, options: GetOptions = {}): Promise<SecretValue | null> {
+    this.ensureOpen(`secrets.get ${name}`);
     throwIfAborted(options.signal, `secrets.get ${name}`);
     return await this.fetchSecret(name, options);
   }
@@ -130,22 +132,26 @@ export abstract class BaseSecretsProvider implements SecretsProvider {
   }
 
   async list(prefixOrPath?: string, options: SignalOptions = {}): Promise<SecretMetadata[]> {
+    this.ensureOpen("secrets.list");
     throwIfAborted(options.signal, "secrets.list");
     const metas = await this.listSecrets(prefixOrPath, options);
     return [...metas].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   }
 
   async set(name: string, value: SecretInput, options: SetOptions = {}): Promise<string> {
+    this.ensureOpen(`secrets.set ${name}`);
     throwIfAborted(options.signal, `secrets.set ${name}`);
     return await this.putSecret(name, encodeSecretInput(value), options);
   }
 
   async delete(name: string, options: DeleteOptions = {}): Promise<void> {
+    this.ensureOpen(`secrets.delete ${name}`);
     throwIfAborted(options.signal, `secrets.delete ${name}`);
     await this.removeSecret(name, options);
   }
 
   async metadata(name: string, options: GetOptions = {}): Promise<SecretMetadata | null> {
+    this.ensureOpen(`secrets.metadata ${name}`);
     throwIfAborted(options.signal, `secrets.metadata ${name}`);
     return await this.fetchMetadata(name, options);
   }
@@ -180,6 +186,7 @@ export abstract class BaseSecretsProvider implements SecretsProvider {
     onChange: WatchCallback,
     options: WatchOptions = {},
   ): WatchHandle {
+    this.ensureOpen(`secrets.watch ${name}`);
     const inner = watchSecret(() => this.get(name, options.get), intervalMs, onChange, options);
     const watchers = this.#watchers;
     const handle: WatchHandle = {
@@ -206,9 +213,27 @@ export abstract class BaseSecretsProvider implements SecretsProvider {
     for (const w of [...this.#watchers]) w.stop();
   }
 
-  /** Stops all watchers (the owning client calls this from `close()`). Idempotent. */
+  /** Whether {@link close} was called. */
+  get closed(): boolean {
+    return this.#closed;
+  }
+
+  /**
+   * Throws `CancelledError` (`"<operation>: client is closed"`, not retryable) once {@link close}
+   * was called (SPEC §2.4). The public operations call it before any I/O; service operations
+   * can call it too.
+   */
+  protected ensureOpen(operation: string): void {
+    if (this.#closed) throw new CancelledError(`${operation}: client is closed`);
+  }
+
+  /**
+   * Stops all watchers (the owning client calls this from `close()`); later calls fail with
+   * `CANCELLED`. Idempotent. Subclasses overriding it must call `super.close()`.
+   */
   close(): Promise<void> {
     this.stopWatchers();
+    this.#closed = true;
     return Promise.resolve();
   }
 }

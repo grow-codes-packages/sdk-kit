@@ -90,7 +90,7 @@ release PR. When it is merged, each released package is published:
 | npm | `npm publish --provenance --access public` (trusted publishing via OIDC) | input `npm-trusted-publishing` or secret `NPM_TOKEN` |
 | crates.io | `rust-lang/crates-io-auth-action` + `cargo publish` | input `crates-trusted-publishing` or secret `CARGO_REGISTRY_TOKEN` |
 | Go | ensures the `go/vX.Y.Z` tag, then `GOPROXY=https://proxy.golang.org go list -m <module>@vX.Y.Z` | always (no credentials) |
-| Maven Central | `mvn -P release deploy` (central-publishing-maven-plugin + maven-gpg-plugin in the `release` profile of `java/pom.xml`) | secrets `MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `MAVEN_GPG_PRIVATE_KEY` (+ `MAVEN_GPG_PASSPHRASE`) |
+| Maven Central | `mvn -P release verify` (maven-gpg-plugin in the `release` profile of `java/pom.xml`), then the workflow zips the signed files into a Central bundle and uploads it to the Central Portal API (`publishingType=AUTOMATIC`, waits for `PUBLISHED`) | secrets `MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `MAVEN_GPG_PRIVATE_KEY` (+ `MAVEN_GPG_PASSPHRASE`) |
 | PyPI | reusable job `python-build` uploads `python-dist`; the **caller's** `pypi` job uploads it with `pypa/gh-action-pypi-publish` | repository variable `PYPI_TRUSTED_PUBLISHING=true` |
 
 Releasable means: the PR titles were Conventional Commits, `release-please-config.json` has the

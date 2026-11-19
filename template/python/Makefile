@@ -1,5 +1,6 @@
 # Python package Makefile (contract shared with CI and the repo root Makefile).
-# Targets: deps build lint test coverage license pack docs clean
+# Targets: deps build lint test coverage license pack release-check docs clean
+# Extra (not part of the shared contract): format, integration
 
 PYTHON ?= python3
 VENV ?= .venv
@@ -9,7 +10,9 @@ COVERAGE_BRANCHES ?= 90
 PKG := grow___KEY_SNAKE__
 RELEASE_CHECK ?= python3 ../.github/scripts/release-check.py
 
-.PHONY: deps build lint test coverage license pack release-check docs clean
+LINT_PATHS ?= src tests tools integration
+
+.PHONY: deps build lint format test coverage license pack release-check integration docs clean
 
 $(PY):
 	$(PYTHON) -m venv $(VENV)
@@ -23,9 +26,13 @@ build:
 	$(PY) -c "import $(PKG); print('$(PKG)', $(PKG).__version__)"
 
 lint:
-	$(PY) -m ruff check src tests tools integration
-	$(PY) -m ruff format --check src tests tools integration
+	$(PY) -m ruff check $(LINT_PATHS)
+	$(PY) -m ruff format --check $(LINT_PATHS)
 	$(PY) -m mypy
+
+format:
+	$(PY) -m ruff format $(LINT_PATHS)
+	$(PY) -m ruff check --fix $(LINT_PATHS)
 
 test:
 	$(PY) -m pytest -q
@@ -62,6 +69,16 @@ release-check: pack
 	$(PYTHON) -m venv build/release-venv
 	build/release-venv/bin/python -m pip install --quiet dist/*.whl
 	cd build && release-venv/bin/python -c "import $(PKG); print('$(PKG)', $(PKG).__version__)"
+
+# Not part of the shared contract: install the wheel with every extra into a clean consumer venv
+# and run integration/ against GROW___KEY_UPPER___URL (needs a running service, otherwise the
+# tests skip; `make test-docker LANGS=python` in the repository root starts one).
+integration: pack
+	$(PYTHON) -m venv --clear build/integration-venv
+	build/integration-venv/bin/python -m pip install --quiet -r integration/requirements.txt \
+		"$$(ls dist/*.whl)[all]"
+	cd integration && GROW_CONFORMANCE_DIR="$${GROW_CONFORMANCE_DIR:-$(CURDIR)/../conformance/scenarios}" \
+		../build/integration-venv/bin/python -m pytest
 
 docs:
 	$(PY) -m mkdocs build --strict --config-file mkdocs.yml --site-dir site

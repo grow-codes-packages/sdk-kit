@@ -6,11 +6,11 @@ import hashlib
 import json
 import re
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from sdk_kit import __version__
+from sdk_kit import __version__, keep
 from sdk_kit.kit import Kit
 from sdk_kit.render import RenderedFile, is_generated_bytes, render
 from sdk_kit.services import (
@@ -37,10 +37,35 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def content_sha256(data: bytes) -> str:
+    """SHA-256 recorded for a file: keep-region bodies removed (equals ``sha256`` without regions)."""
+    return sha256(keep.strip_bytes(data))
+
+
 def _record(item: RenderedFile) -> dict[str, Any]:
     if item.link is not None:
         return {"path": item.path, "symlink": item.link}
-    return {"path": item.path, "sha256": sha256(item.data), "generated": item.generated}
+    return {"path": item.path, "sha256": content_sha256(item.data), "generated": item.generated}
+
+
+def _non_empty_regions(data: bytes) -> tuple[str, ...]:
+    """Names of the keep regions of ``data`` that hold service content."""
+    if b"@sdk-kit:" not in data:
+        return ()
+    try:
+        found = keep.bodies(data.decode("utf-8"))
+    except (UnicodeDecodeError, keep.KeepError):
+        return ()
+    return tuple(name for name, body in found.items() if body.strip())
+
+
+def _with_kept_regions(item: RenderedFile, data: bytes) -> tuple[RenderedFile, tuple[str, ...]]:
+    """``item`` with the keep-region bodies of the existing file ``data``, plus dropped regions."""
+    if b"@sdk-kit:" not in data and b"@sdk-kit:" not in item.data:
+        return item, ()
+    rendered, existing = item.data.decode("utf-8"), data.decode("utf-8")
+    merged = keep.merge(rendered, existing, item.path)
+    return replace(item, data=merged.text.encode("utf-8")), merged.dropped
 
 
 def _write(dest: Path, item: RenderedFile) -> None:
@@ -146,10 +171,14 @@ class SyncReport:
     unchanged: list[str] = field(default_factory=list)
     modified: list[str] = field(default_factory=list)  # locally modified generated files, kept
     owned: list[str] = field(default_factory=list)  # header removed locally: now service-owned, kept
+    # service-owned copies the template now generates, never edited since sdk-kit wrote them: replaced
+    adopted: list[str] = field(default_factory=list)
+    # generated files whose existing keep region the template no longer has (region name in brackets)
+    dropped: list[str] = field(default_factory=list)
 
     @property
     def conflicts(self) -> bool:
-        return bool(self.modified)
+        return bool(self.modified or self.dropped)
 
 
 def _current(dest: Path, path: str) -> tuple[bytes | None, str | None]:
@@ -221,7 +250,8 @@ def sync(
         if not dry_run:
             _write(dest, item)
 
-    for path, item in files.items():
+    for path, rendered in files.items():
+        item = rendered
         data, link = _current(dest, path)
         exists = data is not None or link is not None
         recorded = manifest.files.get(path)
@@ -237,14 +267,35 @@ def sync(
         if not managed:
             continue  # service-owned file: never touched
         if item.generated and (data is None or not is_generated_bytes(data)):
-            report.owned.append(path)
+            # A file the template used to write once (no header) and now generates: take it over
+            # when the repository never changed it (same hash as recorded), otherwise it stays theirs.
+            untouched = (
+                data is not None
+                and recorded is not None
+                and not recorded.get("generated")
+                and recorded.get("sha256") == content_sha256(data)
+            )
+            if untouched:
+                write(item, report.adopted)
+            else:
+                report.owned.append(path)
             continue
+        dropped: tuple[str, ...] = ()
+        if item.generated and data is not None:
+            item, dropped = _with_kept_regions(item, data)
+            if data == item.data:
+                report.unchanged.append(path)
+                records[path] = _record(item)
+                continue
         pristine = recorded is not None and (
             (link is not None and recorded.get("symlink") == link)
-            or (data is not None and recorded.get("sha256") == sha256(data))
+            or (data is not None and recorded.get("sha256") == content_sha256(data))
         )
         if not pristine and not force:
             report.modified.append(path)
+            continue
+        if dropped and not force:
+            report.dropped.append(f"{path} [{', '.join(dropped)}]")
             continue
         write(item, report.updated)
 
@@ -259,10 +310,14 @@ def sync(
             records.pop(path, None)
             continue
         pristine = (link is not None and recorded.get("symlink") == link) or (
-            data is not None and recorded.get("sha256") == sha256(data)
+            data is not None and recorded.get("sha256") == content_sha256(data)
         )
         if not pristine and not force:
             report.modified.append(path)
+            continue
+        lost = _non_empty_regions(data) if data is not None else ()
+        if lost and not force:
+            report.dropped.append(f"{path} [{', '.join(lost)}]")
             continue
         report.removed.append(path)
         records.pop(path, None)

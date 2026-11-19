@@ -19,6 +19,14 @@ export {
   type SpanExporterFactory,
   type TracingHandle,
 } from "./init.js";
+export {
+  OTLP_USER_AGENT,
+  createOtlpExporter,
+  httpTracesEndpoint,
+  loadOtlpTls,
+  otlpGrpcCredentials,
+  type OtlpTlsMaterial,
+} from "./otlp.js";
 export { toAttributeMap } from "./attributes.js";
 export {
   DEFAULT_TRACER_NAME,
