@@ -325,6 +325,23 @@ jobs:
             exit 1
           fi
           mvn -B -ntp -T 1 -U -Daether.transport.http.retryHandler.count=5 -P release -DskipTests deploy
+      - name: Show the Central bundle
+        if: always() && steps.gate.outputs.enabled == 'true'
+        working-directory: java
+        run: |
+          find target/central-staging -type f 2>/dev/null | sort || true
+          for z in target/central-publishing/central-bundle.zip target/central-staging/central-bundle.zip; do
+            [ -f "$z" ] && { echo "== $z"; unzip -l "$z"; }
+          done
+          ls -la target/central-publishing target/central-staging 2>/dev/null || true
+      - name: Keep the Central bundle
+        if: failure() && steps.gate.outputs.enabled == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: central-bundle
+          path: java/target/central-publishing/central-bundle.zip
+          if-no-files-found: ignore
+          retention-days: 7
 
   python-build:
     name: build Python distributions
