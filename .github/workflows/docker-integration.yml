@@ -1,0 +1,107 @@
+# Reusable Docker integration run for one language of a Grow Codes SDK repo (sdk-kit).
+#
+# Runs `make test-docker LANGS=<lang>` from `working-directory` (the repo root): the real
+# service from docker/compose.yml, the bootstrap container, then the `test-<lang>` consumer
+# image that packs the package and runs the integration + conformance suite (SPEC section 8).
+# On failure the compose logs are uploaded as `compose-logs-<lang>`: the root Makefile writes
+# `docker compose logs` into $COMPOSE_LOGS_DIR before its `down -v` trap, and this workflow adds
+# whatever containers are still around.
+#
+#   jobs:
+#     docker:
+#       strategy:
+#         matrix:
+#           lang: [typescript, rust, go, python, java]
+#       uses: grow-codes-packages/sdk-kit/.github/workflows/docker-integration.yml@main
+#       with:
+#         lang: ${{ matrix.lang }}
+name: docker-integration
+
+on:
+  workflow_call:
+    inputs:
+      lang:
+        description: One of typescript, rust, go, python, java.
+        type: string
+        required: true
+      working-directory:
+        description: Repo root that holds the root Makefile and docker/compose.yml.
+        type: string
+        default: "."
+      runs-on:
+        description: Runner label (needs Docker with the compose plugin).
+        type: string
+        default: ubuntu-24.04
+      timeout-minutes:
+        description: Job timeout.
+        type: number
+        default: 45
+      source-artifact:
+        description: Optional artifact holding `source.tar` (a rendered repo) used instead of a checkout.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    name: docker (${{ inputs.lang }})
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    env:
+      WD: ${{ inputs.working-directory }}
+      LANG_NAME: ${{ inputs.lang }}
+      DOCKER_BUILDKIT: "1"
+    steps:
+      - name: Validate input
+        run: |
+          case "$LANG_NAME" in
+            typescript|rust|go|python|java) ;;
+            *) echo "::error title=docker-integration::unknown lang '$LANG_NAME'"; exit 1 ;;
+          esac
+          echo "COMPOSE_LOGS_DIR=$RUNNER_TEMP/compose-logs" >> "$GITHUB_ENV"
+
+      - name: Check out
+        if: inputs.source-artifact == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download rendered source
+        if: inputs.source-artifact != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.source-artifact }}
+          path: ${{ runner.temp }}/source
+      - name: Unpack rendered source
+        if: inputs.source-artifact != ''
+        run: tar -xf "$RUNNER_TEMP/source/source.tar" -C "$GITHUB_WORKSPACE"
+
+      - name: Docker versions
+        run: |
+          docker version --format 'docker {{.Server.Version}}'
+          docker compose version
+
+      - name: make test-docker LANGS=${{ inputs.lang }}
+        run: |
+          mkdir -p "$COMPOSE_LOGS_DIR"
+          make -C "$WD" test-docker LANGS="$LANG_NAME"
+
+      - name: Collect compose logs
+        if: failure()
+        run: |
+          mkdir -p "$COMPOSE_LOGS_DIR"
+          docker ps -a --format '{{.ID}} {{.Names}} {{.Image}} {{.Status}}' > "$COMPOSE_LOGS_DIR/containers.txt" || true
+          for id in $(docker ps -aq); do
+            name=$(docker inspect --format '{{.Name}}' "$id" | tr -d '/')
+            docker logs --timestamps "$id" > "$COMPOSE_LOGS_DIR/container-${name}.log" 2>&1 || true
+          done
+          ls -la "$COMPOSE_LOGS_DIR"
+      - name: Upload compose logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compose-logs-${{ inputs.lang }}
+          path: ${{ runner.temp }}/compose-logs/
+          if-no-files-found: warn
+          retention-days: 14

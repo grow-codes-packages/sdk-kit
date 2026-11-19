@@ -1,0 +1,21 @@
+sdk-kit
+Copyright 2026 Grow Codes <opensource@grow.codes>
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+Source: https://github.com/grow-codes-packages/sdk-kit
+
+This software is provided "AS IS", WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+either express or implied. To the maximum extent permitted by applicable law,
+Grow Codes is not responsible for any damage, data loss, security incident,
+outage or cost that results from using this software or the repositories and
+packages generated with it. See sections 7 and 8 of the Apache License, 2.0.
+
+Product names in spec/services.json and in the template are trademarks of their
+respective owners. Grow Codes is not affiliated with, endorsed or sponsored by
+them; the names are used only to identify the services the SDKs connect to.
+
+Third-party content:
+
+  CODE_OF_CONDUCT.md (and template/common/CODE_OF_CONDUCT.md) is adapted from
+  the Contributor Covenant, version 2.1, https://www.contributor-covenant.org,
+  licensed under CC BY 4.0.

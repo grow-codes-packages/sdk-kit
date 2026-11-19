@@ -1,0 +1,45 @@
+# The service under test for the Docker integration suites (sdk-kit SPEC §8).
+#
+# OWNED BY THIS REPOSITORY. sdk-kit writes this file once (`sdk-kit new`) and never overwrites it.
+# Replace the placeholder below with the real deployment of __DISPLAY__ (image tag = stack catalog,
+# extra containers such as databases are fine). Keep these names, docker/compose.yml relies on them:
+#   service     the endpoint the SDK talks to (GROW___KEY_UPPER___URL=http://service:__PORT__);
+#               it must have a healthcheck
+#   bootstrap   one-shot job: prepares the service and writes /bootstrap/env, exits 0
+#   bootstrap   (volume) shared, mounted read-only into the test containers
+# Never publish host ports (`ports:`). Ready-made variants for emulators live in sdk-kit/harness
+# (moto, fakeintake, betterstack-stub).
+
+services:
+  # --- SERVICE: replace with the real service ---------------------------------------------------
+  service:
+    image: __IMAGE__
+    networks:
+      default:
+        aliases: [__KEY__]
+    healthcheck:
+      # Replace with the service's own readiness probe (an HTTP health endpoint or CLI status).
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:__PORT__/ || curl -fsS -o /dev/null http://127.0.0.1:__PORT__/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 60s
+      start_interval: 1s
+  # --- end SERVICE ---------------------------------------------------------------------------------
+
+  bootstrap:
+    image: alpine:3.24.4
+    depends_on:
+      service:
+        condition: service_healthy
+    volumes:
+      - bootstrap:/bootstrap
+      - ./bootstrap:/scripts:ro
+      - ./harness:/harness:ro
+    environment:
+      SERVICE_URL: http://service:__PORT__
+    entrypoint: ["/bin/sh", "/scripts/bootstrap.sh"]
+    restart: "no"
+
+volumes:
+  bootstrap: {}

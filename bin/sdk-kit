@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Run sdk-kit from a checkout without installing it: bin/sdk-kit new openbao --dest ../openbao
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+root=$(dirname -- "$here")
+python=${PYTHON:-python3}
+PYTHONPATH="$root${PYTHONPATH:+:$PYTHONPATH}" exec "$python" -m sdk_kit "$@"
