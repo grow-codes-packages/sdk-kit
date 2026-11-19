@@ -55,7 +55,8 @@ jobs:
             primary: false
     env:
       WD: ${{ inputs.working-directory }}
-      MAVEN_ARGS: -B -ntp -T 1
+      # -U re-checks releases a cached run recorded as missing; retries absorb transient Maven Central errors.
+      MAVEN_ARGS: -B -ntp -T 1 -U -Daether.transport.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.count=5
     steps:
       - name: Check out
         if: inputs.source-artifact == ''

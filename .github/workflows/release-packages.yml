@@ -324,7 +324,7 @@ jobs:
             echo "::error title=Maven Central::java/pom.xml has no 'release' profile (central-publishing-maven-plugin + maven-gpg-plugin)"
             exit 1
           fi
-          mvn -B -ntp -T 1 -P release -DskipTests deploy
+          mvn -B -ntp -T 1 -U -Daether.transport.http.retryHandler.count=5 -P release -DskipTests deploy
 
   python-build:
     name: build Python distributions

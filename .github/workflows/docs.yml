@@ -63,7 +63,7 @@ jobs:
       actions: read # coverage artifacts of an earlier CI run
     env:
       SITE_DIR: ${{ github.workspace }}/_site
-      MAVEN_ARGS: -B -ntp -T 1
+      MAVEN_ARGS: -B -ntp -T 1 -U -Daether.transport.http.retryHandler.count=5 -Dmaven.wagon.http.retryHandler.count=5
       CARGO_TERM_COLOR: always
       NO_MKDOCS_2_WARNING: "1"
     steps:
