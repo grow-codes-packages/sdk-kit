@@ -336,7 +336,6 @@ public final class TracingConfig {
     return setGlobal;
   }
 
-  /** Header values are redacted when the header name is sensitive. */
   /**
    * Returns whether {@link #protocol()} was set explicitly on the builder (rather than left at the
    * SDK default), so a service package can apply its own default or the {@code OTEL_*} environment
@@ -392,6 +391,7 @@ public final class TracingConfig {
     return compressionExplicit;
   }
 
+  /** Header values are redacted when the header name is sensitive. */
   @Override
   public String toString() {
     return "TracingConfig{serviceName="
