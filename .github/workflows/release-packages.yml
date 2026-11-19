@@ -277,7 +277,7 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.java-release-created == 'true'
     runs-on: ${{ inputs.runs-on }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -324,7 +324,39 @@ jobs:
             echo "::error title=Maven Central::java/pom.xml has no 'release' profile (central-publishing-maven-plugin + maven-gpg-plugin)"
             exit 1
           fi
-          mvn -B -ntp -T 1 -U -Daether.transport.http.retryHandler.count=5 -P release -DskipTests deploy
+          # Build + sign, then upload a bundle we assemble ourselves: the central-publishing plugin also
+          # stages resolver files (_remote.repositories, maven-metadata-local.xml) on some Maven versions,
+          # and Central rejects those ("content that does NOT have a .pom file").
+          mvn -B -ntp -T 1 -U -Daether.transport.http.retryHandler.count=5 -P release -DskipTests verify
+          G=$(mvn -q -B -ntp -DforceStdout help:evaluate -Dexpression=project.groupId)
+          A=$(mvn -q -B -ntp -DforceStdout help:evaluate -Dexpression=project.artifactId)
+          V=$(mvn -q -B -ntp -DforceStdout help:evaluate -Dexpression=project.version)
+          D="target/central-bundle/${G//.//}/$A/$V"
+          rm -rf target/central-bundle && mkdir -p "$D"
+          cp pom.xml "$D/$A-$V.pom"
+          cp "target/$A-$V.pom.asc" "$D/" 2>/dev/null || true
+          for f in "target/$A-$V.jar" "target/$A-$V-sources.jar" "target/$A-$V-javadoc.jar"; do
+            cp "$f" "$f.asc" "$D/"
+          done
+          [ -f "$D/$A-$V.pom.asc" ] || { echo "::error::missing $A-$V.pom.asc"; exit 1; }
+          ( cd "$D" && for f in *.pom *.jar; do md5sum "$f" | cut -d' ' -f1 > "$f.md5"; sha1sum "$f" | cut -d' ' -f1 > "$f.sha1"; done )
+          ( cd target/central-bundle && zip -qr ../central-bundle.zip . )
+          unzip -l target/central-bundle.zip
+          AUTH=$(printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" | base64 -w0)
+          ID=$(curl -sf -H "Authorization: Bearer $AUTH" -F "bundle=@target/central-bundle.zip" \
+            "https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC&name=$A-$V")
+          echo "deployment $ID"
+          for _ in $(seq 1 90); do
+            ST=$(curl -sf -X POST -H "Authorization: Bearer $AUTH" "https://central.sonatype.com/api/v1/publisher/status?id=$ID")
+            STATE=$(jq -r .deploymentState <<<"$ST")
+            echo "state: $STATE"
+            case "$STATE" in
+              PUBLISHED) exit 0 ;;
+              FAILED) jq . <<<"$ST"; echo "::error title=Maven Central::deployment $ID failed"; exit 1 ;;
+            esac
+            sleep 20
+          done
+          echo "::error title=Maven Central::deployment $ID not published after 30 minutes (state $STATE)"; exit 1
       - name: Show the Central bundle
         if: always() && steps.gate.outputs.enabled == 'true'
         working-directory: java
