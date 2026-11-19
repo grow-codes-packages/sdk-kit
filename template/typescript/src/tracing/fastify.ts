@@ -23,23 +23,29 @@ export interface FastifyReplyLike {
   statusCode?: number;
 }
 
-type Done = (error?: Error) => void;
+/** The `done` callback Fastify passes to hooks and plugins. */
+export type FastifyDoneCallback = (error?: Error) => void;
 
 /** The parts of a Fastify instance the plugin uses. */
 export interface FastifyInstanceLike {
   addHook(
     name: "onRequest" | "onResponse",
-    hook: (req: FastifyRequestLike, reply: FastifyReplyLike, done: Done) => void,
+    hook: (req: FastifyRequestLike, reply: FastifyReplyLike, done: FastifyDoneCallback) => void,
   ): unknown;
   addHook(
     name: "onError",
-    hook: (req: FastifyRequestLike, reply: FastifyReplyLike, error: Error, done: Done) => void,
+    hook: (
+      req: FastifyRequestLike,
+      reply: FastifyReplyLike,
+      error: Error,
+      done: FastifyDoneCallback,
+    ) => void,
   ): unknown;
 }
 
 /** Fastify plugin function with the `fastify-plugin` markers (hooks apply to the whole app). */
 export interface FastifyTracingPlugin {
-  (instance: FastifyInstanceLike, opts: ServerTracingOptions, done: Done): void;
+  (instance: FastifyInstanceLike, opts: ServerTracingOptions, done: FastifyDoneCallback): void;
   [key: symbol]: unknown;
 }
 
@@ -52,7 +58,7 @@ export interface FastifyTracingPlugin {
  * ```
  */
 export const fastifyTracing: FastifyTracingPlugin = Object.assign(
-  (instance: FastifyInstanceLike, opts: ServerTracingOptions, done: Done): void => {
+  (instance: FastifyInstanceLike, opts: ServerTracingOptions, done: FastifyDoneCallback): void => {
     const spans = new WeakMap<FastifyRequestLike, OtelSpan>();
     instance.addHook("onRequest", (req, _reply, next) => {
       if (isIgnored(pathOf(req.url), opts.ignorePaths)) {

@@ -38,6 +38,7 @@ export {
   withSpan,
   type HeadersLike,
   type PropagationOptions,
+  type TracedFunction,
   type TracedOptions,
   type WithSpanOptions,
 } from "./helpers.js";
@@ -60,6 +61,7 @@ export {
   type Span,
   type SpanAttrValue,
   type SpanAttributes,
+  type SpanDecodeOptions,
   type SpanEvent,
   type SpanJson,
   type SpanKindName,
@@ -95,6 +97,7 @@ export {
 } from "./express.js";
 export {
   fastifyTracing,
+  type FastifyDoneCallback,
   type FastifyInstanceLike,
   type FastifyReplyLike,
   type FastifyRequestLike,

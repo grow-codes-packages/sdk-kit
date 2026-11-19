@@ -93,6 +93,58 @@ public class __SERVICE__Exception extends RuntimeException {
   }
 
   /**
+   * Like {@link #of(ErrorCode, String, Integer, String, Duration, Throwable)} with an explicit
+   * {@code retryable} flag instead of the default of the code.
+   *
+   * @param code canonical code
+   * @param message redacted human text
+   * @param httpStatus HTTP status, may be null
+   * @param requestId vendor request id, may be null
+   * @param retryable whether retrying the same call may succeed
+   * @param retryAfter server-requested wait, may be null
+   * @param cause underlying error, may be null
+   * @return a new exception of the matching subclass
+   */
+  public static __SERVICE__Exception of(
+      ErrorCode code,
+      String message,
+      Integer httpStatus,
+      String requestId,
+      boolean retryable,
+      Duration retryAfter,
+      Throwable cause) {
+    switch (code) {
+      case CONFIG:
+        return new ConfigException(message, httpStatus, requestId, retryable, retryAfter, cause);
+      case AUTHENTICATION:
+        return new AuthenticationException(
+            message, httpStatus, requestId, retryable, retryAfter, cause);
+      case PERMISSION_DENIED:
+        return new PermissionDeniedException(
+            message, httpStatus, requestId, retryable, retryAfter, cause);
+      case NOT_FOUND:
+        return new NotFoundException(message, httpStatus, requestId, retryable, retryAfter, cause);
+      case CONFLICT:
+        return new ConflictException(message, httpStatus, requestId, retryable, retryAfter, cause);
+      case RATE_LIMITED:
+        return new RateLimitException(message, httpStatus, requestId, retryable, retryAfter, cause);
+      case VALIDATION:
+        return new ValidationException(
+            message, httpStatus, requestId, retryable, retryAfter, cause);
+      case UNAVAILABLE:
+        return new UnavailableException(
+            message, httpStatus, requestId, retryable, retryAfter, cause);
+      case TIMEOUT:
+        return new TimeoutException(message, httpStatus, requestId, retryable, retryAfter, cause);
+      case UNSUPPORTED:
+        return new UnsupportedException(
+            message, httpStatus, requestId, retryable, retryAfter, cause);
+      default:
+        return new CancelledException(message, httpStatus, requestId, retryable, retryAfter, cause);
+    }
+  }
+
+  /**
    * Returns the canonical error code.
    *
    * @return the code

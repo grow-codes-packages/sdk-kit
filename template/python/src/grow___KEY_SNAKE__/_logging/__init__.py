@@ -12,6 +12,7 @@ from ._batch import (
     DropReason,
 )
 from ._client import (
+    DEFAULT_REDACTION,
     AsyncBatchingLogClient,
     AsyncLogClient,
     BatchingLogClient,
@@ -74,6 +75,7 @@ __all__ = [
     "Logger",
     "current_trace_context",
     # redaction
+    "DEFAULT_REDACTION",
     "DEFAULT_REDACT_KEYS",
     "RedactionProcessor",
     # query

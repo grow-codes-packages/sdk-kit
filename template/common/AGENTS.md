@@ -73,6 +73,7 @@ Run from the repository root (all languages) or inside one language folder (same
 | `make coverage` | unit tests + coverage gate, writes `<lang>/coverage/summary.json` |
 | `make license` | dependency licence allowlist check |
 | `make pack` | build the installable artifact into `<lang>/dist/` |
+| `make release-check` | release readiness: release-please config, metadata, dry-run publish |
 | `make docs` | API docs + documentation site |
 | `make test-docker` | integration tests in Docker (`LANGS="go python"` for a subset) |
 | `make clean` | remove build output |
@@ -117,6 +118,13 @@ Prefer the `make` targets; they are what CI runs.
 - Releases are made by [release-please](https://github.com/googleapis/release-please) from
   Conventional Commits on `main` (`feat:`, `fix:`, `feat!:`). Never bump versions or edit
   `CHANGELOG.md` by hand. Use the language as the scope when a change touches one package.
+- **PR titles are Conventional Commits**, e.g. `feat: add KV v2 metadata (GRO-123)` — the squash
+  commit takes the PR title, and release-please skips any other title (`GRO-123: …` releases
+  nothing). Types: `feat fix perf revert deps docs refactor test build ci chore`; the `pr-title` CI
+  job enforces it.
+- `make release-check` proves every package is publishable (release-please config + manifest,
+  version files, registry metadata, dry-run publish). `.release-please-manifest.json` lists all five
+  packages; `0.0.0` means "not released yet" (the first release uses `initial-version`).
 - One release pull request covers all five packages. Tags: `typescript-vX.Y.Z`, `rust-vX.Y.Z`,
   `go/vX.Y.Z` (the Go module lives in `go/`, so its tag must be `go/v…` for `go get` to work),
   `python-vX.Y.Z`, `java-vX.Y.Z`.
@@ -128,7 +136,7 @@ Prefer the `make` targets; they are what CI runs.
 - Keep secrets out of code, tests, fixtures, logs and commit messages. Credentials are always wrapped
   in the redacting secret type; error messages pass through redaction.
 - Runtime dependencies must use a licence from the allowlist: Apache-2.0, MIT, BSD-2-Clause,
-  BSD-3-Clause, ISC, Zlib, Unicode-3.0, Unicode-DFS-2016, 0BSD, CC0-1.0, MPL-2.0. Never GPL, LGPL,
+  BSD-3-Clause, ISC, Zlib, Unicode-3.0, Unicode-DFS-2016, 0BSD, CC0-1.0, MIT-0, MPL-2.0. Never GPL, LGPL,
   AGPL, SSPL, BUSL or EPL at runtime.
 - Keep dependencies small; prefer the standard library.
 - Before you push: `make lint coverage` for every language you touched (or all of them for shared

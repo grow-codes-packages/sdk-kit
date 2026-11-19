@@ -17,6 +17,7 @@ from ._model import AttrValue, LogInput, LogRecord, Severity
 from ._redaction import RedactionProcessor
 
 __all__ = [
+    "DEFAULT_REDACTION",
     "AsyncBatchingLogClient",
     "AsyncLogClient",
     "BatchingLogClient",
@@ -26,7 +27,10 @@ __all__ = [
     "current_trace_context",
 ]
 
-_DEFAULT_REDACTION = RedactionProcessor()
+#: The redaction processor log clients use by default (SPEC default keys). Service clients
+#: use it as their ``redaction=`` default too.
+DEFAULT_REDACTION = RedactionProcessor()
+_DEFAULT_REDACTION = DEFAULT_REDACTION  # deprecated private alias (kept for existing imports)
 
 
 def current_trace_context() -> tuple[str, str, int] | None:
@@ -224,7 +228,7 @@ class BatchingLogClient(_ClientBase):
         *,
         options: BatchOptions | None = None,
         resource: Mapping[str, AttrValue] | None = None,
-        redaction: RedactionProcessor | None = _DEFAULT_REDACTION,
+        redaction: RedactionProcessor | None = DEFAULT_REDACTION,
         correlate: bool = True,
     ) -> None:
         super().__init__(resource=resource, redaction=redaction, correlate=correlate)
@@ -268,7 +272,7 @@ class AsyncBatchingLogClient(_ClientBase):
         *,
         options: BatchOptions | None = None,
         resource: Mapping[str, AttrValue] | None = None,
-        redaction: RedactionProcessor | None = _DEFAULT_REDACTION,
+        redaction: RedactionProcessor | None = DEFAULT_REDACTION,
         correlate: bool = True,
     ) -> None:
         super().__init__(resource=resource, redaction=redaction, correlate=correlate)

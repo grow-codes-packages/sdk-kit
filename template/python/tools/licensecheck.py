@@ -19,6 +19,7 @@ ALLOWED = frozenset(
         # SPDX identifiers from the SPEC allowlist
         "apache-2.0",
         "mit",
+        "mit-0",
         "bsd-2-clause",
         "bsd-3-clause",
         "isc",

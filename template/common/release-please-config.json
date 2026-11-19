@@ -22,7 +22,8 @@
       "release-type": "node",
       "component": "typescript",
       "package-name": "@grow-codes/__KEY__",
-      "initial-version": "__VERSION__"
+      "initial-version": "__VERSION__",
+      "extra-files": ["src/core/version.ts"]
     },
     "rust": {
       "release-type": "rust",
@@ -36,19 +37,23 @@
       "package-name": "github.com/grow-codes-packages/__KEY__/go",
       "tag-separator": "/",
       "include-v-in-tag": true,
-      "initial-version": "__VERSION__"
+      "initial-version": "__VERSION__",
+      "extra-files": ["version.go"]
     },
     "python": {
       "release-type": "python",
       "component": "python",
       "package-name": "grow-__KEY__",
-      "initial-version": "__VERSION__"
+      "initial-version": "__VERSION__",
+      "extra-files": ["src/grow___KEY_SNAKE__/_version.py"]
     },
     "java": {
-      "release-type": "maven",
+      "release-type": "java",
       "component": "java",
       "package-name": "codes.grow.packages:__KEY__",
-      "initial-version": "__VERSION__"
+      "initial-version": "__VERSION__",
+      "skip-snapshot": true,
+      "extra-files": ["pom.xml"]
     }
   }
 }

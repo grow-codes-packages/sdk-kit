@@ -135,10 +135,16 @@ func TestLoggingFactoryAndOptions(t *testing.T) {
 		t.Fatal("bad options accepted")
 	}
 	boom := errors.New("boom")
-	if _, err := LoggingFactory(func(context.Context, __PKG__.BatchOptions) (LoggingTarget, error) { return LoggingTarget{}, boom })(ctx, &Env{}); !errors.Is(err, boom) {
+	failing := func(context.Context, __PKG__.BatchOptions) (LoggingTarget, error) {
+		return LoggingTarget{}, boom
+	}
+	if _, err := LoggingFactory(failing)(ctx, &Env{}); !errors.Is(err, boom) {
 		t.Fatalf("fn error: %v", err)
 	}
-	if _, err := LoggingFactory(func(context.Context, __PKG__.BatchOptions) (LoggingTarget, error) { return LoggingTarget{}, nil })(ctx, &Env{}); err == nil {
+	noClient := func(context.Context, __PKG__.BatchOptions) (LoggingTarget, error) {
+		return LoggingTarget{}, nil
+	}
+	if _, err := LoggingFactory(noClient)(ctx, &Env{}); err == nil {
 		t.Fatal("nil client accepted")
 	}
 	if _, _, err := NewMemoryLogging(__PKG__.LogClientOptions{Batch: __PKG__.BatchOptions{DropPolicy: "x"}}); err == nil {
@@ -242,9 +248,17 @@ func TestMemoryLogQuery(t *testing.T) {
 	}
 	var mu sync.Mutex
 	var seen, fromStart []string
-	h, _ := q.Tail(ctx, "tail", func(r __PKG__.LogRecord) { mu.Lock(); seen = append(seen, r.Body); mu.Unlock() }, __PKG__.TailOptions{Interval: time.Millisecond})
+	h, _ := q.Tail(ctx, "tail", func(r __PKG__.LogRecord) {
+		mu.Lock()
+		seen = append(seen, r.Body)
+		mu.Unlock()
+	}, __PKG__.TailOptions{Interval: time.Millisecond})
 	q.TailInterval = 0
-	h2, _ := q.Tail(ctx, "", func(r __PKG__.LogRecord) { mu.Lock(); fromStart = append(fromStart, r.Body); mu.Unlock() }, __PKG__.TailOptions{Start: base.Add(4 * time.Minute)})
+	h2, _ := q.Tail(ctx, "", func(r __PKG__.LogRecord) {
+		mu.Lock()
+		fromStart = append(fromStart, r.Body)
+		mu.Unlock()
+	}, __PKG__.TailOptions{Start: base.Add(4 * time.Minute)})
 	_, _ = e.Export(ctx, []__PKG__.LogRecord{{Timestamp: base.Add(time.Hour), Body: "tail me"}, {Timestamp: base.Add(time.Hour), Body: "skip"}}, __PKG__.ExportOptions{})
 	deadline := time.Now().Add(5 * time.Second)
 	for {

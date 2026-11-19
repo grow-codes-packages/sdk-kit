@@ -43,19 +43,23 @@ pub use helpers::{
     with_span_sync, SpanOptions, TraceFields,
 };
 pub use init::{
-    build_resource, build_sampler, init_tracing_with, init_tracing_with_propagators,
-    otel_attributes, otel_value, TracingHandle,
+    build_resource, build_sampler, init_tracing_with, init_tracing_with_pipeline,
+    init_tracing_with_propagators, init_tracing_with_sampler, otel_attributes, otel_value,
+    PipelineOptions, TracingHandle,
 };
 pub use model::{
-    build_tree, normalize_span_id, normalize_trace_id, sort_spans, DependencyLink, Span, SpanEvent,
-    SpanKind, SpanLink, SpanNode, SpanStatus, StatusCode, Trace, TraceSearchQuery, TraceSummary,
+    build_tree, normalize_span_id, normalize_span_id_or_native, normalize_trace_id,
+    normalize_trace_id_or_native, sort_spans, DependencyLink, Span, SpanEvent, SpanKind, SpanLink,
+    SpanNode, SpanStatus, StatusCode, Trace, TraceSearchQuery, TraceSummary,
 };
-pub use otlp::otlp_exporter;
+pub use otlp::{http_traces_endpoint, otlp_exporter};
 pub use propagation::{
     build_propagator, extract, extract_headers, inject, inject_context, inject_headers,
     inject_headers_context, B3Propagator, BoxedPropagator,
 };
-pub use query::{wait_for_trace, DependencyOptions, TraceQueryClient, WaitForTraceOptions};
+pub use query::{
+    wait_for_trace, wait_for_trace_with, DependencyOptions, TraceQueryClient, WaitForTraceOptions,
+};
 pub use subscriber::{instrument, otel_layer};
 
 #[cfg(feature = "reqwest-middleware")]

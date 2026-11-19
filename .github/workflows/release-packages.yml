@@ -24,7 +24,9 @@
 #
 # Required release-please config (repo root, template/common/release-please-config.json):
 # packages "typescript" (node), "rust" (rust), "go" (go, component "go", "tag-separator": "/"
-# so tags read go/v1.2.3), "python" (python), "java" (maven).
+# so tags read go/v1.2.3), "python" (python), "java" (java + "skip-snapshot", or maven), with
+# extra-files for the version constants; `make release-config` in the repo validates it. PR titles
+# must be Conventional Commits (pr-title.yml), or release-please finds nothing to release.
 name: release-packages
 
 on:
@@ -180,7 +182,8 @@ jobs:
         run: |
           set -- dist/*.tgz
           if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then echo "::error::expected one tarball in typescript/dist"; exit 1; fi
-          npm publish "$1" --provenance --access public
+          # "./" keeps npm from reading dist/<file>.tgz as a GitHub "owner/repo" shorthand.
+          npm publish "./$1" --provenance --access public
 
   crates:
     name: publish crates.io

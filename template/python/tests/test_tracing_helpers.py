@@ -12,7 +12,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.trace import Link, SpanKind, StatusCode
 
-from grow___KEY_SNAKE__._core.errors import ValidationError
+from grow___KEY_SNAKE__._core.errors import CancelledError, ValidationError
 from grow___KEY_SNAKE__._tracing import (
     add_event,
     build_propagator,
@@ -156,6 +156,23 @@ async def test_traced_async(setup: tuple[otel_trace.Tracer, InMemorySpanExporter
 
     assert await fetch(21) == 42
     assert exporter.spans[0].name.endswith("fetch")
+
+
+async def test_cancellation_is_not_a_span_error(
+    setup: tuple[otel_trace.Tracer, InMemorySpanExporter],
+) -> None:
+    tracer, exporter = setup
+
+    @traced(tracer=tracer)
+    async def cancelled() -> None:
+        raise CancelledError("op: cancelled")
+
+    with pytest.raises(CancelledError):
+        await cancelled()
+    with pytest.raises(CancelledError), with_span("ctx", tracer=tracer):
+        raise CancelledError("op: client is closed")
+    assert [s.status.code for s in exporter.spans] == ["unset", "unset"]
+    assert all(not s.events for s in exporter.spans)
 
 
 def test_record_exception_and_set_error(

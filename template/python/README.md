@@ -1,7 +1,7 @@
 # grow-__KEY__ (Python)
 
 Python SDK for [__DISPLAY__](https://grow-codes-packages.github.io/__KEY__/) by Grow Codes.
-Unofficial and community maintained; "__DISPLAY__" is a trademark of __VENDOR__.
+Unofficial and community maintained; "__DISPLAY__" is a trademark of its owner (__VENDOR__).
 
 ```bash
 pip install grow-__KEY__

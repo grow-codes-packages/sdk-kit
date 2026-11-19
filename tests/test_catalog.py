@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -46,8 +48,10 @@ def test_generate_every_service(real_kit: Kit, tmp_path: Path, svc: Service) -> 
         assert (title in readme) == (cat in svc.categories), cat
 
     notice = (dest / "NOTICE").read_text(encoding="utf-8")
-    assert f"not affiliated with, endorsed or sponsored by {svc.vendor}" in notice.replace("\n", " ")
-    assert f"{svc.display} is a trademark of {svc.vendor}" in notice.replace("\n", " ")
+    flat = notice.replace("\n", " ")
+    assert f"not affiliated with, endorsed or sponsored by the owner of {svc.display} ({svc.vendor})" in flat
+    assert f"{svc.display} is a trademark of its owner ({svc.vendor})" in flat
+    assert ".." not in flat
     assert (
         "Grow Codes is not\nresponsible for any damage, data loss, security incident, outage or cost"
         in notice
@@ -69,10 +73,22 @@ def test_generate_every_service(real_kit: Kit, tmp_path: Path, svc: Service) -> 
         "rust",
         "go",
         "python",
-        "maven",
+        "java",
     }
     assert all(p["initial-version"] == "0.1.0" for p in config["packages"].values())
-    assert json.loads((dest / ".release-please-manifest.json").read_text()) == {}
+    assert config["packages"]["java"]["skip-snapshot"] is True
+    extra = {lang: p.get("extra-files") for lang, p in config["packages"].items()}
+    assert extra == {
+        "typescript": ["src/core/version.ts"],
+        "rust": None,
+        "go": ["version.go"],
+        "python": [f"src/grow_{svc.key_snake}/_version.py"],
+        "java": ["pom.xml"],
+    }
+    assert json.loads((dest / ".release-please-manifest.json").read_text()) == dict.fromkeys(LANGS, "0.0.0")
+    for name in ("docs/license.md", "README.md", "docs/index.md", "NOTICE", "SECURITY.md"):
+        text = (dest / name).read_text(encoding="utf-8")
+        assert "Inc.." not in text and "Inc.**." not in text, name
 
     scenarios = {p.name.split(".")[0] for p in (dest / "conformance" / "scenarios").glob("*.json")}
     assert scenarios == {"core", *svc.categories}
@@ -124,3 +140,46 @@ def test_real_template_renders_for_every_service() -> None:
         cats = set(svc.categories)
         for missing in set(CATEGORIES) - cats:
             assert not any(f"/{missing}/" in p for p in files), (svc.key, missing)
+
+
+RELEASE_CHECK = ".github/scripts/release-check.py"
+
+
+def run_release_check(dest: Path, what: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(dest / RELEASE_CHECK), what], capture_output=True, text=True, check=False
+    )
+
+
+def test_release_config_check_on_generated_repo(tmp_path: Path) -> None:
+    """The generated release-check script accepts a fresh repo and names every broken rule."""
+    kit = locate()
+    if not all((kit.template / lang / "Makefile").is_file() for lang in LANGS):
+        pytest.skip("language templates not written yet")
+    svc = CATALOG[0]
+    dest = tmp_path / svc.key
+    new(kit, svc, dest)
+    for what in ("config", "go", "typescript"):
+        result = run_release_check(dest, what)
+        assert result.returncode == 0, result.stderr
+    usage = run_release_check(dest, "nope")
+    assert usage.returncode == 2
+
+    (dest / ".release-please-manifest.json").write_text('{"typescript": "0.2.0"}\n', encoding="utf-8")
+    config = json.loads((dest / "release-please-config.json").read_text(encoding="utf-8"))
+    config["packages"]["python"]["extra-files"] = []
+    config["packages"]["rust"]["package-name"] = "grow-other"
+    (dest / "release-please-config.json").write_text(json.dumps(config), encoding="utf-8")
+    gomod = dest / "go" / "go.mod"
+    gomod.write_text(gomod.read_text(encoding="utf-8") + "replace example.com/x => ../x\n", encoding="utf-8")
+    result = run_release_check(dest, "config")
+    assert result.returncode == 1
+    for needle in (
+        "'rust' missing or not a version",
+        "packages.rust.package-name is 'grow-other'",
+        "packages.python.extra-files must list",
+        "typescript: package version is '0.1.0', release-please expects '0.2.0'",
+        "replace directives",
+    ):
+        assert needle in result.stderr, needle
+    assert run_release_check(dest, "go").returncode == 1

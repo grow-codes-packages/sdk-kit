@@ -45,6 +45,8 @@ def test_async_client(env: dict[str, str]) -> None:
 
 
 def test_bad_token_is_rejected(env: dict[str, str]) -> None:
+    if "auth" not in CORE_CAPABILITIES:
+        pytest.skip("the deployment under test has no authentication (no 'auth' capability)")
     with core_client({**env, "GROW___KEY_UPPER___TOKEN": "definitely-wrong-token"}) as c:
         with pytest.raises(sdk.AuthenticationError) as info:
             c.ping()

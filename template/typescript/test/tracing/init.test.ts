@@ -241,6 +241,20 @@ describe("initTracingWith", () => {
     await handle.shutdown();
   });
 
+  it("uses the sampler override instead of config.sampler", async () => {
+    const exporter = new MemorySpanExporter();
+    const handle = initTracingWith(
+      { serviceName: "svc", sampler: "always_on", setGlobal: false },
+      () => exporter,
+      { sampler: createSampler({ sampler: "always_off", samplerRatio: 1 }) },
+    );
+    expect(handle.config.sampler).toBe("always_on");
+    handle.tracer("t").startSpan("dropped").end();
+    await handle.forceFlush();
+    expect(exporter.spans).toEqual([]);
+    await handle.shutdown();
+  });
+
   it("does not touch globals with setGlobal=false and times out flushes", async () => {
     const slow: SpanExporter = {
       export: () => undefined,

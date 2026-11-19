@@ -15,6 +15,7 @@ from sdk_kit.render import (
     decode_text,
     is_generated_bytes,
     is_generated_text,
+    lang_of,
     path_categories,
     render,
     replace_tokens,
@@ -306,3 +307,26 @@ def test_demo_overrides(tmp_path: Path) -> None:
         "docker/demo/server.py",
     ]
     _apply_demo_overrides({})  # nothing to override is fine
+
+
+@pytest.mark.parametrize(
+    "path,lang",
+    [
+        ("go/version.go", "go"),
+        ("examples/java/pom.xml", "java"),
+        ("examples/README.md", None),
+        ("examples/other/x", None),
+        ("docs/index.md", None),
+        ("typescript", "typescript"),
+    ],
+)
+def test_lang_of(path: str, lang: str | None) -> None:
+    assert lang_of(path) == lang
+
+
+def test_render_lang_versions(kit: Kit) -> None:
+    write(kit.template / "rust" / "VERSION", "__VERSION__\n")
+    write(kit.template / "common" / "VERSION", "__VERSION__\n")
+    files = render(kit, ALPHA, "0.1.0", {"rust": "1.2.3"})
+    assert files["rust/VERSION"].data == b"1.2.3\n"
+    assert files["VERSION"].data == b"0.1.0\n"

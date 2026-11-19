@@ -312,6 +312,33 @@ pub fn normalize_trace_id(id: &str) -> Result<String> {
     normalize_hex(id, 32, "trace id")
 }
 
+/// [`normalize_trace_id`] for hex ids; any other non-empty id (a native id such as a
+/// SkyWalking segment/trace id) is returned trimmed and unchanged. Use it where a backend's own
+/// ids must not be rejected.
+pub fn normalize_trace_id_or_native(id: &str) -> Result<String> {
+    native_or(id, 32, "trace id")
+}
+
+/// [`normalize_span_id`] for hex ids; any other non-empty id is returned trimmed and unchanged.
+pub fn normalize_span_id_or_native(id: &str) -> Result<String> {
+    native_or(id, 16, "span id")
+}
+
+fn native_or(id: &str, len: usize, what: &str) -> Result<String> {
+    let t = id.trim();
+    if t.is_empty() {
+        return Err(Error::validation(format!("invalid {what}: empty")));
+    }
+    let hex = t
+        .strip_prefix("0x")
+        .or_else(|| t.strip_prefix("0X"))
+        .unwrap_or(t);
+    if hex.len() <= len && !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return normalize_hex(t, len, what);
+    }
+    Ok(t.to_string())
+}
+
 /// Lower-cases and left-pads a span id to 16 hex characters.
 pub fn normalize_span_id(id: &str) -> Result<String> {
     normalize_hex(id, 16, "span id")

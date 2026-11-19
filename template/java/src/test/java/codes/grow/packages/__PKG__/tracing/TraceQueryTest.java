@@ -258,6 +258,55 @@ class TraceQueryTest {
   }
 
   @Test
+  void nativeIdsCanBeAccepted() {
+    String nativeTrace = "a1b2c3d4.45.16789";
+    assertThatThrownBy(() -> TraceIds.traceId(nativeTrace)).isInstanceOf(ValidationException.class);
+    assertThat(TraceIds.nativeIdsAccepted()).isFalse();
+    TraceIds.acceptNativeIds(true);
+    try {
+      assertThat(TraceIds.nativeIdsAccepted()).isTrue();
+      Span root = span(" " + nativeTrace + " ", "seg-1", null, "root", "svc", 0);
+      Span child = span(nativeTrace, "seg-2", "seg-1", "child", "svc", 1);
+      Span hex = span("ABC", "0x1F", null, "hex", "svc", 2);
+      assertThat(root.traceId()).isEqualTo(nativeTrace);
+      assertThat(child.parentSpanId()).contains("seg-1");
+      assertThat(hex.traceId()).isEqualTo("0".repeat(29) + "abc");
+      assertThat(hex.spanId()).isEqualTo("000000000000001f");
+      assertThat(new Trace(nativeTrace, List.of(root, child)).traceId()).isEqualTo(nativeTrace);
+      assertThat(
+              new TraceSummary(nativeTrace, Optional.empty(), Optional.empty(), 0, 0, 2).traceId())
+          .isEqualTo(nativeTrace);
+      InMemoryTraceQueryClient q = new InMemoryTraceQueryClient(() -> List.of(root, child));
+      assertThat(
+              q.waitForTrace(
+                      nativeTrace,
+                      new WaitForTraceOptions(Duration.ofSeconds(5), Duration.ofMillis(5), 2))
+                  .spans())
+          .hasSize(2);
+      for (String bad : new String[] {"", "  ", "0".repeat(32), "1".repeat(33)}) {
+        assertThatThrownBy(() -> TraceIds.traceId(bad)).isInstanceOf(ValidationException.class);
+      }
+      assertThatThrownBy(() -> TraceIds.spanId(null)).isInstanceOf(ValidationException.class);
+    } finally {
+      TraceIds.acceptNativeIds(false);
+    }
+    assertThat(TraceIds.normalizeTraceIdOrNative("x.y")).isEqualTo("x.y");
+    assertThat(TraceIds.normalizeSpanIdOrNative("ff")).isEqualTo("00000000000000ff");
+    assertThat(TraceIds.traceId("ff")).hasSize(32);
+    assertThatThrownBy(() -> TraceIds.spanId("x.y")).isInstanceOf(ValidationException.class);
+  }
+
+  @Test
+  void waitForTraceOptionsTellUnsetInterval() {
+    Duration two = Duration.ofSeconds(2);
+    assertThat(WaitForTraceOptions.defaults().explicitInterval()).isEmpty();
+    assertThat(WaitForTraceOptions.defaults().intervalOr(two)).isEqualTo(two);
+    WaitForTraceOptions set = new WaitForTraceOptions(null, Duration.ofSeconds(1), 1);
+    assertThat(set.explicitInterval()).contains(Duration.ofSeconds(1));
+    assertThat(set.intervalOr(two)).isEqualTo(Duration.ofSeconds(1));
+  }
+
+  @Test
   void queryClientDefaults() throws Exception {
     AtomicInteger calls = new AtomicInteger();
     TraceQueryClient client =

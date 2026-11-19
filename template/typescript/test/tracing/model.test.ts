@@ -178,6 +178,31 @@ describe("JSON form", () => {
     expect(() => spanFromJson({ ...minimal, attributes: [] })).toThrow(/attributes/);
     expect(() => traceFromJson({ traceId: T, spans: [{}] })).toThrow(ValidationError);
   });
+
+  it("keeps native ids verbatim with normalizeIds=false", () => {
+    const native = {
+      traceId: " 2a.71.1700000000000 ",
+      spanId: "2a.71.1700000000000-0",
+      parentSpanId: "2a.71.1700000000000-1",
+      name: "n",
+      serviceName: "s",
+      startMicros: 1,
+      endMicros: 2,
+      links: [{ traceId: "other.1.2", spanId: "other.1.2-0" }],
+    };
+    const opts = { normalizeIds: false };
+    const span = spanFromJson(native, opts);
+    expect(span.traceId).toBe("2a.71.1700000000000");
+    expect(span.spanId).toBe("2a.71.1700000000000-0");
+    expect(span.parentSpanId).toBe("2a.71.1700000000000-1");
+    expect(span.links[0]).toMatchObject({ traceId: "other.1.2", spanId: "other.1.2-0" });
+    const trace = traceFromJson({ traceId: "2a.71.1700000000000", spans: [native] }, opts);
+    expect(trace.traceId).toBe("2a.71.1700000000000");
+    expect(trace.spans[0]?.spanId).toBe("2a.71.1700000000000-0");
+    expect(() => spanFromJson({ ...native, spanId: "  " }, opts)).toThrow(/spanId/);
+    expect(() => spanFromJson(native)).toThrow(ValidationError);
+    expect(() => traceFromJson({ traceId: "2a.71.1", spans: [] })).toThrow(ValidationError);
+  });
 });
 
 describe("OTel conversion helpers", () => {

@@ -272,6 +272,10 @@ class AsyncPollingTail:
         while True:
             try:
                 await self.poll_once()
+            except asyncio.CancelledError:
+                # The SDK CancelledError is also an Exception: without this clause a stop()
+                # that lands during an in-flight search would be swallowed and stop() would hang.
+                raise
             except Exception as exc:  # noqa: BLE001 - reported to on_error, polling continues
                 if self._on_error is not None:
                     self._on_error(exc)

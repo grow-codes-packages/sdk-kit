@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,6 +16,7 @@ from sdk_kit.render import RenderedFile, is_generated_bytes, render
 from sdk_kit.services import (
     DEFAULT_PACKAGE_VERSION,
     DEMO,
+    LANGS,
     Service,
     ServiceError,
     find_service,
@@ -22,6 +24,9 @@ from sdk_kit.services import (
 )
 
 MANIFEST = ".sdk-kit.json"
+RELEASE_MANIFEST = ".release-please-manifest.json"
+UNRELEASED = "0.0.0"
+_SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 
 
 class GenerateError(RuntimeError):
@@ -170,6 +175,26 @@ def _sync_service(kit: Kit, manifest: Manifest, override: Service | None) -> Ser
         return Service.from_dict(manifest.service)
 
 
+def released_versions(dest: Path) -> dict[str, str]:
+    """Package versions release-please has released, per language (``.release-please-manifest.json``).
+
+    Release PRs bump the version in generated files too (``typescript/src/core/version.ts``,
+    ``java/pom.xml``), so ``sync`` renders those languages with the released version instead of
+    the original ``packageVersion``. ``0.0.0`` means "not released yet" and is ignored.
+    """
+    try:
+        data = json.loads((dest / RELEASE_MANIFEST).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {
+        lang: version
+        for lang in LANGS
+        if isinstance(version := data.get(lang), str) and _SEMVER_RE.match(version) and version != UNRELEASED
+    }
+
+
 def sync(
     kit: Kit,
     dest: Path,
@@ -186,7 +211,7 @@ def sync(
         raise GenerateError(f"{dest} was generated for {manifest.key!r}, not {svc.key!r}")
     chosen = categories or (tuple(manifest.categories) if manifest.categories else svc.categories)
     svc = svc.with_categories(normalize_categories(list(chosen)))
-    files = render(kit, svc, manifest.package_version)
+    files = render(kit, svc, manifest.package_version, released_versions(dest))
     report = SyncReport()
     records = dict(manifest.files)
 

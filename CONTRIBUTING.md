@@ -17,7 +17,9 @@ reaches 17 repositories in five languages. Please read [AGENTS.md](AGENTS.md) fi
 ## Commit messages
 
 Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat(template/go): …`,
-`fix(generator): …`, `docs: …`).
+`fix(generator): …`, `docs: …`). **PR titles** must be Conventional Commits too, e.g.
+`fix(template): bump version constants on release (GRO-1366)` — the squash commit takes the PR
+title and release-please reads it; CI (`pr-title`) checks it.
 
 ## Licence
 

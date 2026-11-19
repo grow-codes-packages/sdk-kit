@@ -1,6 +1,7 @@
 # Reusable TypeScript pipeline for Grow Codes SDK repos (sdk-kit).
 #
-# Runs the language Makefile contract (deps lint build test coverage license pack) in
+# Runs the language Makefile contract (deps lint build test coverage license pack)
+# plus `make release-check` (release readiness, dry-run publish) on the primary job in
 # `working-directory`. Node 24 (active LTS) runs every target and uploads
 # `coverage/summary.json` as the artifact `coverage-typescript` plus the npm tarball as
 # `dist-typescript`; Node 22 (maintenance LTS, the SPEC minimum) builds and tests.
@@ -76,6 +77,15 @@ jobs:
 
       - name: make ${{ matrix.targets }}
         run: make -C "$WD" ${{ matrix.targets }}
+
+      - name: make release-check
+        if: matrix.primary
+        run: |
+          if ! grep -q '^release-check:' "$WD/Makefile"; then
+            echo "::warning title=release-check skipped::$WD/Makefile has no release-check target yet; update it from sdk-kit (template/typescript/Makefile)"
+            exit 0
+          fi
+          make -C "$WD" release-check
 
       - name: Upload coverage summary
         if: matrix.primary && inputs.upload-artifacts

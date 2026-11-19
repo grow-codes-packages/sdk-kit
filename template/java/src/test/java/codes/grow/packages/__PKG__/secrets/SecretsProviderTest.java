@@ -4,6 +4,7 @@ package codes.grow.packages.__PKG__.secrets;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import codes.grow.packages.__PKG__.core.CancelledException;
 import codes.grow.packages.__PKG__.core.ConflictException;
 import codes.grow.packages.__PKG__.core.Json;
 import codes.grow.packages.__PKG__.core.NotFoundException;
@@ -394,7 +395,8 @@ class SecretsProviderTest {
             () ->
                 closed.watch(
                     Optional::empty, Duration.ofSeconds(1), (n, o) -> {}, WatchOptions.none()))
-        .isInstanceOf(IllegalStateException.class);
+        .isInstanceOf(CancelledException.class)
+        .hasMessageContaining("client is closed");
   }
 
   @Test
@@ -403,8 +405,30 @@ class SecretsProviderTest {
     p.close();
     p.close();
     assertThat(h.isStopped()).isTrue();
+    assertThat(p.isClosed()).isTrue();
     assertThatThrownBy(() -> p.watch("", Duration.ofSeconds(1), (n, o) -> {}))
-        .isInstanceOf(ValidationException.class);
+        .isInstanceOf(CancelledException.class);
+  }
+
+  @Test
+  void callsOnClosedProviderAreCancelled() {
+    p.set("a", "1");
+    assertThat(p.isClosed()).isFalse();
+    p.close();
+    List<Runnable> calls =
+        List.of(
+            () -> p.get("a"),
+            () -> p.list(""),
+            () -> p.getAll(""),
+            () -> p.set("a", "2"),
+            () -> p.delete("a"),
+            () -> p.metadata("a", GetOptions.none()),
+            () -> p.watch("a", Duration.ofSeconds(1), (n, o) -> {}));
+    for (Runnable call : calls) {
+      assertThatThrownBy(call::run)
+          .isInstanceOf(CancelledException.class)
+          .hasMessageContaining(": client is closed");
+    }
   }
 
   static void awaitSize(List<?> list, int n) throws InterruptedException {

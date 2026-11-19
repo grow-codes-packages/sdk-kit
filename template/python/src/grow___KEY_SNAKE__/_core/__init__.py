@@ -23,12 +23,16 @@ from .errors import (
 from .health import HealthStatus, apoll_until, poll_until
 from .hooks import LOGGER_NAME, ErrorInfo, Hooks, LoggerLike, RequestInfo, ResponseInfo, get_logger
 from .http import (
+    REQUEST_ID_HEADERS,
+    RETRY_AFTER_HEADERS,
     AsyncHttpTransport,
+    ErrorMapper,
     HttpTransport,
     Request,
     Response,
     error_from_status,
     new_idempotency_key,
+    retry_after_from_headers,
 )
 from .redaction import (
     REDACTED,
@@ -80,6 +84,10 @@ __all__ = [
     "Response",
     "error_from_status",
     "new_idempotency_key",
+    "ErrorMapper",
+    "REQUEST_ID_HEADERS",
+    "RETRY_AFTER_HEADERS",
+    "retry_after_from_headers",
     "SDK_NAME",
     "user_agent",
     # hooks + logging

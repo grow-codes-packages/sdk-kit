@@ -18,6 +18,7 @@ import {
   type Trace,
 } from "../tracing/model.js";
 import type { TraceQueryClient } from "../tracing/query.js";
+import { pollForExpectation } from "./expect.js";
 import type { CategoryOps } from "./runner.js";
 
 /** What the tracing factory returns (SPEC §6). */
@@ -115,7 +116,12 @@ export const tracingOps: CategoryOps<TracingTarget> = {
         throw error;
       }
     },
-    listServices: (target) => requireQuery(target).listServices(),
+    listServices: (target, args, context) => {
+      const query = requireQuery(target);
+      return pollForExpectation(() => query.listServices(), args, context, {
+        operation: "tracing.listServices",
+      });
+    },
   },
   dispose: (target) => target.handle.shutdown(),
   variables: (target) => ({ serviceName: target.serviceName ?? target.handle.config.serviceName }),

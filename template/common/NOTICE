@@ -28,10 +28,10 @@ Trademarks
 -------------------------------------------------------------------------------
 
 This project is an independent, community-maintained client library. It is not
-affiliated with, endorsed or sponsored by __VENDOR__.
-__DISPLAY__ is a trademark of __VENDOR__. All other product names, logos and
-brands are the property of their respective owners and are used for
-identification purposes only.
+affiliated with, endorsed or sponsored by the owner of __DISPLAY__
+(__VENDOR__). __DISPLAY__ is a trademark of its owner (__VENDOR__);
+all other product names, logos and brands are the property of their respective
+owners and are used for identification purposes only.
 
 The __DISPLAY__ server itself is licensed separately by its owner:
 __UPSTREAM_LICENSE__.
@@ -45,7 +45,7 @@ Third-party attributions
 The packages in this repository depend on third-party open-source libraries,
 each under its own licence (all on the allowlist in AGENTS.md: Apache-2.0, MIT,
 BSD-2-Clause, BSD-3-Clause, ISC, Zlib, Unicode-3.0, Unicode-DFS-2016, 0BSD,
-CC0-1.0, MPL-2.0). The full dependency lists and their licences are produced by
+CC0-1.0, MIT-0, MPL-2.0). The full dependency lists and their licences are produced by
 "make license" in each language folder:
 
   typescript/  npm dependencies        (license-checker-rseidelsohn)

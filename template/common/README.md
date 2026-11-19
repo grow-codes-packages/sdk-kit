@@ -267,7 +267,7 @@ Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) 
 ## Trademarks and disclaimer
 
 This is an independent, community-maintained project. It is **not affiliated with, endorsed or
-sponsored by __VENDOR__**. __DISPLAY__ is a trademark of __VENDOR__; it is used here only to name the
+sponsored by its owner (__VENDOR__)**. __DISPLAY__ is a trademark of __VENDOR__; it is used here only to name the
 service this SDK connects to. The __DISPLAY__ server is licensed separately by its owner
 (__UPSTREAM_LICENSE__).
 

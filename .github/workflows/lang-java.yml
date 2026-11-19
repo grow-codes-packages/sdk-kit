@@ -1,6 +1,7 @@
 # Reusable Java pipeline for Grow Codes SDK repos (sdk-kit).
 #
-# Runs the language Makefile contract (deps lint build test coverage license pack) in
+# Runs the language Makefile contract (deps lint build test coverage license pack)
+# plus `make release-check` (release readiness, dry-run publish) on the primary job in
 # `working-directory` with Eclipse Temurin. Java 21 runs every target (Spotless, -Werror,
 # JaCoCo gates, licence allowlist, jar + sources + javadoc) and uploads `coverage/summary.json`
 # as `coverage-java` plus the jars as `dist-java`; Java 17 (the bytecode baseline) and 25 build
@@ -81,6 +82,15 @@ jobs:
 
       - name: make ${{ matrix.targets }}
         run: make -C "$WD" ${{ matrix.targets }}
+
+      - name: make release-check
+        if: matrix.primary
+        run: |
+          if ! grep -q '^release-check:' "$WD/Makefile"; then
+            echo "::warning title=release-check skipped::$WD/Makefile has no release-check target yet; update it from sdk-kit (template/java/Makefile)"
+            exit 0
+          fi
+          make -C "$WD" release-check
 
       - name: Upload coverage summary
         if: matrix.primary && inputs.upload-artifacts

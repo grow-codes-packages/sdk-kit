@@ -1,6 +1,7 @@
 # Reusable Python pipeline for Grow Codes SDK repos (sdk-kit).
 #
-# Runs the language Makefile contract (deps lint build test coverage license pack) in
+# Runs the language Makefile contract (deps lint build test coverage license pack)
+# plus `make release-check` (release readiness, dry-run publish) on the primary job in
 # `working-directory`. Python 3.13 runs every target (ruff, mypy --strict, pytest-cov gates,
 # pip-licenses, wheel + sdist) and uploads `coverage/summary.json` as `coverage-python` plus
 # the distributions as `dist-python`; 3.10 (the SPEC minimum) and 3.14 build and test.
@@ -80,6 +81,17 @@ jobs:
         env:
           PYTHON: ${{ steps.python.outputs.python-path }}
         run: make -C "$WD" PYTHON="$PYTHON" ${{ matrix.targets }}
+
+      - name: make release-check
+        if: matrix.primary
+        env:
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          if ! grep -q '^release-check:' "$WD/Makefile"; then
+            echo "::warning title=release-check skipped::$WD/Makefile has no release-check target yet; update it from sdk-kit (template/python/Makefile)"
+            exit 0
+          fi
+          make -C "$WD" PYTHON="$PYTHON" release-check
 
       - name: Upload coverage summary
         if: matrix.primary && inputs.upload-artifacts

@@ -8,7 +8,8 @@ commit SHA with the version in a comment; every job declares least-privilege `pe
 ## Language pipelines
 
 Each runs the language Makefile contract `deps lint build test coverage license pack` in the
-language folder.
+language folder; the primary job then runs `make release-check` (registry metadata + dry-run
+publish; skipped with a warning while a repository's Makefile has no such target).
 
 | Workflow | Matrix (primary in bold) | Primary job extras |
 | - | - | - |
@@ -29,6 +30,16 @@ Non-primary entries run `deps build test` (Go: also lint and coverage).
 
 `coverage/summary.json` has the shape
 `{"lines": {"covered", "total", "pct"}, "branches": {…} | null}`.
+
+## `pr-title.yml`
+
+Fails unless the pull request title is a Conventional Commit
+(`<type>[(scope)][!]: <description>`, types `feat fix perf revert deps docs refactor test build ci
+chore`). Squash merges take the PR title as commit message and release-please ignores any other
+format, so a `GRO-123: …` title would release nothing. Reads the current title through the API
+(re-running after an edit works); shell + `gh` only. Caller: `if: github.event_name ==
+'pull_request'`, permissions `contents: read`, `pull-requests: read`. Input `types` overrides the
+list.
 
 ## `docker-integration.yml`
 
@@ -82,6 +93,11 @@ release PR. When it is merged, each released package is published:
 | Maven Central | `mvn -P release deploy` (central-publishing-maven-plugin + maven-gpg-plugin in the `release` profile of `java/pom.xml`) | secrets `MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `MAVEN_GPG_PRIVATE_KEY` (+ `MAVEN_GPG_PASSPHRASE`) |
 | PyPI | reusable job `python-build` uploads `python-dist`; the **caller's** `pypi` job uploads it with `pypa/gh-action-pypi-publish` | repository variable `PYPI_TRUSTED_PUBLISHING=true` |
 
+Releasable means: the PR titles were Conventional Commits, `release-please-config.json` has the
+five packages with `extra-files` for the version constants (Java: release-type `java`,
+`skip-snapshot`, `pom.xml`), `.release-please-manifest.json` lists all five (`0.0.0` before the
+first release) and `make release-check` passes (`sdk-kit-check.yml` runs `make release-config`).
+
 A publish job whose credentials or trust are missing ends green with a notice, so CI stays green
 until the registries are set up. PyPI trusted publishing does not accept reusable workflows,
 which is why the PyPI upload lives in each repository's own `release.yml` (job `pypi`, environment
@@ -99,11 +115,14 @@ Outputs: `releases-created`, `paths-released`, `<lang>-version`, `python-release
 | Maven Central | namespace `codes.grow.packages` verified, user token, GPG key published | the four `MAVEN_*` secrets |
 | GitHub Pages | Settings → Pages → Source: GitHub Actions | — |
 
-The variables can be set once at organization level.
+The variables can be set once at organization level. Repository settings: squash merge commit
+title = **pull request title** (`squash_merge_commit_title=PR_TITLE`; the default
+`COMMIT_OR_PR_TITLE` uses the commit message of single-commit PRs). npm provenance and the Go
+proxy need **public** repositories.
 
 ## sdk-kit's own workflows
 
 | Workflow | Jobs |
 | - | - |
-| `ci.yml` | generator `make lint test check-all` (Python 3.10, 3.13); render `demo`; the five language pipelines, Docker integration per language, `sdk-kit check` and the docs build on the rendered demo (via the local reusable workflows); actionlint; sdk-kit's own docs (deployed from `main`) |
+| `ci.yml` | PR title check; generator `make lint test check-all` (Python 3.10, 3.13); render `demo`; the five language pipelines, Docker integration per language, `sdk-kit check` and the docs build on the rendered demo (via the local reusable workflows); actionlint; sdk-kit's own docs (deployed from `main`) |
 | `release.yml` | release-please (tags `vX.Y.Z`, first `v0.1.0`) and the moving major tag `v0` |

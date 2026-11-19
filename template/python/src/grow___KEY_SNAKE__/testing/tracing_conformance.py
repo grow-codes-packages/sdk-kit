@@ -114,4 +114,5 @@ tracing_ops = {
     "listServices": _list_services,
 }
 
-register_ops("tracing", tracing_ops, teardown=_teardown)
+# listServices is eventually consistent (Tempo, SkyWalking list a new service ~30 s late).
+register_ops("tracing", tracing_ops, teardown=_teardown, polled={"listServices"})

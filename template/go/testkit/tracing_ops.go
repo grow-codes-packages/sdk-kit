@@ -220,4 +220,6 @@ func init() {
 			return q.ListServices(ctx)
 		}),
 	})
+	// Backends list a new service some time after its first trace is readable.
+	RegisterPollingOp("tracing", "listServices")
 }

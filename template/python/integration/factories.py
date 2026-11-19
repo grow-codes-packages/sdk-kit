@@ -17,8 +17,9 @@ import grow___KEY_SNAKE__ as sdk
 
 URL_VAR = "GROW___KEY_UPPER___URL"
 
-#: Capabilities of the deployment under test for the core scenarios ("version" = serverVersion).
-CORE_CAPABILITIES: set[str] = {"version"}
+#: Capabilities of the deployment under test for the core scenarios ("version" = serverVersion,
+#: "auth" = the deployment rejects a wrong token; drop it for services without authentication).
+CORE_CAPABILITIES: set[str] = {"version", "auth"}
 
 
 def core_client(env: Mapping[str, str]) -> sdk.__SERVICE__Client:

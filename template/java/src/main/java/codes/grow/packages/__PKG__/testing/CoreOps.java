@@ -2,13 +2,15 @@
 package codes.grow.packages.__PKG__.testing;
 
 import codes.grow.packages.__PKG__.__SERVICE__Client;
+import codes.grow.packages.__PKG__.core.HealthStatus;
+import java.time.Duration;
 import java.util.Map;
 
 /**
  * Conformance operations of the {@code core} category: {@code health}, {@code ping}, {@code
  * serverVersion}, {@code close}.
  *
- * <p>The target is a {@link __SERVICE__Client}.
+ * <p>The target is a {@link __SERVICE__Client} or a {@link CoreTarget}.
  */
 public final class CoreOps implements ConformanceOps {
   /** Creates the operations. */
@@ -22,17 +24,41 @@ public final class CoreOps implements ConformanceOps {
   @Override
   public Map<String, OpHandler> ops() {
     return Map.of(
-        "health", ctx -> client(ctx).health(),
-        "ping", ctx -> client(ctx).ping().toNanos() / 1e6,
-        "serverVersion", ctx -> client(ctx).serverVersion(),
+        "health", ctx -> core(ctx).health(),
+        "ping", ctx -> core(ctx).ping().toNanos() / 1e6,
+        "serverVersion", ctx -> core(ctx).serverVersion(),
         "close",
             ctx -> {
-              client(ctx).close();
+              core(ctx).close();
               return null;
             });
   }
 
-  private static __SERVICE__Client client(StepContext ctx) {
-    return ctx.target(__SERVICE__Client.class);
+  private static CoreTarget core(StepContext ctx) {
+    if (ctx.target() instanceof CoreTarget) {
+      return (CoreTarget) ctx.target();
+    }
+    __SERVICE__Client client = ctx.target(__SERVICE__Client.class);
+    return new CoreTarget() {
+      @Override
+      public HealthStatus health() {
+        return client.health();
+      }
+
+      @Override
+      public Duration ping() {
+        return client.ping();
+      }
+
+      @Override
+      public String serverVersion() {
+        return client.serverVersion();
+      }
+
+      @Override
+      public void close() {
+        client.close();
+      }
+    };
   }
 }

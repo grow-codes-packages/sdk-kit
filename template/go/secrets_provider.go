@@ -91,6 +91,9 @@ func (b *BaseSecretsProvider) Primitives() SecretPrimitives { return b.prims }
 
 // Get implements SecretsProvider.
 func (b *BaseSecretsProvider) Get(ctx context.Context, name string, opts *GetOptions) (*SecretValue, error) {
+	if err := b.checkOpen("secrets.get"); err != nil {
+		return nil, err
+	}
 	if err := checkName("secrets.get", name); err != nil {
 		return nil, err
 	}
@@ -124,6 +127,9 @@ func (b *BaseSecretsProvider) Require(ctx context.Context, name string, opts *Ge
 
 // Exists implements SecretsProvider.
 func (b *BaseSecretsProvider) Exists(ctx context.Context, name string, opts *GetOptions) (bool, error) {
+	if err := b.checkOpen("secrets.exists"); err != nil {
+		return false, err
+	}
 	if err := checkName("secrets.exists", name); err != nil {
 		return false, err
 	}
@@ -141,6 +147,9 @@ func (b *BaseSecretsProvider) GetMany(ctx context.Context, names []string, opts 
 
 // GetAll implements SecretsProvider.
 func (b *BaseSecretsProvider) GetAll(ctx context.Context, path string) (map[string]*SecretValue, error) {
+	if err := b.checkOpen("secrets.getAll"); err != nil {
+		return nil, err
+	}
 	mds, err := b.prims.ListSecrets(ctx, path)
 	if err != nil {
 		return nil, err
@@ -160,6 +169,9 @@ func (b *BaseSecretsProvider) GetAll(ctx context.Context, path string) (map[stri
 
 // List implements SecretsProvider.
 func (b *BaseSecretsProvider) List(ctx context.Context, prefixOrPath string) ([]SecretMetadata, error) {
+	if err := b.checkOpen("secrets.list"); err != nil {
+		return nil, err
+	}
 	mds, err := b.prims.ListSecrets(ctx, prefixOrPath)
 	if err != nil {
 		return nil, err
@@ -170,6 +182,9 @@ func (b *BaseSecretsProvider) List(ctx context.Context, prefixOrPath string) ([]
 
 // Set implements SecretsProvider.
 func (b *BaseSecretsProvider) Set(ctx context.Context, name string, value any, opts *SetOptions) (string, error) {
+	if err := b.checkOpen("secrets.set"); err != nil {
+		return "", err
+	}
 	if err := checkName("secrets.set", name); err != nil {
 		return "", err
 	}
@@ -186,6 +201,9 @@ func (b *BaseSecretsProvider) Set(ctx context.Context, name string, value any, o
 
 // Delete implements SecretsProvider.
 func (b *BaseSecretsProvider) Delete(ctx context.Context, name string, opts *DeleteOptions) error {
+	if err := b.checkOpen("secrets.delete"); err != nil {
+		return err
+	}
 	if err := checkName("secrets.delete", name); err != nil {
 		return err
 	}
@@ -198,6 +216,9 @@ func (b *BaseSecretsProvider) Delete(ctx context.Context, name string, opts *Del
 
 // Metadata implements SecretsProvider.
 func (b *BaseSecretsProvider) Metadata(ctx context.Context, name string, opts *GetOptions) (*SecretMetadata, error) {
+	if err := b.checkOpen("secrets.metadata"); err != nil {
+		return nil, err
+	}
 	if err := checkName("secrets.metadata", name); err != nil {
 		return nil, err
 	}
@@ -206,6 +227,9 @@ func (b *BaseSecretsProvider) Metadata(ctx context.Context, name string, opts *G
 
 // LoadEnv implements SecretsProvider.
 func (b *BaseSecretsProvider) LoadEnv(ctx context.Context, path string, opts *LoadEnvOptions) (map[string]string, error) {
+	if err := b.checkOpen("secrets.loadEnv"); err != nil {
+		return nil, err
+	}
 	return loadEnvPath(ctx, b.prims.ListSecrets, b.Get, path, opts)
 }
 
@@ -236,7 +260,17 @@ func (b *BaseSecretsProvider) Watch(ctx context.Context, name string, interval t
 	return h
 }
 
-// Close stops every watcher. It is idempotent.
+// checkOpen returns CANCELLED ("client is closed") once Close was called.
+func (b *BaseSecretsProvider) checkOpen(op string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.closed {
+		return &Error{Code: ErrorCodeCancelled, Message: op + ": client is closed"}
+	}
+	return nil
+}
+
+// Close stops every watcher; later calls fail with CANCELLED. It is idempotent.
 func (b *BaseSecretsProvider) Close() error {
 	b.mu.Lock()
 	b.closed = true

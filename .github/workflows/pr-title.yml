@@ -1,0 +1,67 @@
+# Reusable pull request title check for Grow Codes SDK repos (sdk-kit).
+#
+# Pull requests are squash-merged and the squash commit takes the PR title, so release-please reads
+# the PR title as the commit message. It only understands Conventional Commits; any other title
+# ("GRO-123: …") is skipped as "commit could not be parsed" and no release PR is opened. This job
+# fails unless the title reads
+#
+#   <type>[(<scope>)][!]: <description>
+#
+# with <type> one of feat fix perf revert deps docs refactor test build ci chore, for example
+# `feat: add KV v2 metadata (GRO-123)` or `fix(rust)!: rename Client::open (GRO-124)`.
+# The current title is read from the API, so re-running the job after editing the title works.
+# Runs only shell + gh (no third-party actions).
+#
+#   jobs:
+#     pr-title:
+#       if: github.event_name == 'pull_request'
+#       uses: grow-codes-packages/sdk-kit/.github/workflows/pr-title.yml@main
+#       permissions:
+#         contents: read
+#         pull-requests: read
+name: pr-title
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: Runner label.
+        type: string
+        default: ubuntu-24.04
+      types:
+        description: Allowed Conventional Commit types (space separated).
+        type: string
+        default: feat fix perf revert deps docs refactor test build ci chore
+
+permissions:
+  contents: read
+
+jobs:
+  pr-title:
+    name: PR title (Conventional Commits)
+    if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check the pull request title
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_TITLE: ${{ github.event.pull_request.title }}
+          TYPES: ${{ inputs.types }}
+        run: |
+          title=$(gh api "repos/$REPO/pulls/$NUMBER" --jq '.title' 2>/dev/null || true)
+          if [ -z "$title" ]; then title=$EVENT_TITLE; fi
+          printf 'PR title: %s\n' "$title"
+          alternatives=$(printf '%s' "$TYPES" | tr -s ' ' '|')
+          pattern="^(${alternatives})(\([A-Za-z0-9._/-]+\))?!?: [^ ].*"
+          if printf '%s\n' "$title" | grep -Eq "$pattern"; then
+            echo "OK: Conventional Commit title."
+            exit 0
+          fi
+          echo "::error title=PR title is not a Conventional Commit::'$title' — use '<type>[(scope)][!]: <description>' with type one of: $TYPES. Example: 'feat: add KV v2 metadata (GRO-123)'. release-please ignores other titles, so nothing would be released."
+          exit 1

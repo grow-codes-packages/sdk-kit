@@ -32,6 +32,7 @@ export class MemorySpanExporter implements SpanExporter {
     return this;
   }
 
+  /** Converts the spans to the query model and stores them (or fails as scripted). */
   export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
     if (this.#stopped) {
       resultCallback({
@@ -83,7 +84,7 @@ function traces(spans: readonly Span[]): Trace[] {
   return [...byId.entries()].map(([traceId, list]) => ({ traceId, spans: sortSpans(list) }));
 }
 
-/** {@link TraceQueryClient} over spans held in memory (usually a {@link MemorySpanExporter}). */
+/** `TraceQueryClient` over spans held in memory (usually a {@link MemorySpanExporter}). */
 export class MemoryTraceQueryClient extends BaseTraceQueryClient {
   readonly #source: { readonly spans: readonly Span[] };
 

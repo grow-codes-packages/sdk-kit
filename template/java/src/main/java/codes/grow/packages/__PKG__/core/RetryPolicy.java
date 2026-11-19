@@ -21,6 +21,9 @@ public final class RetryPolicy {
   /** Default maximum number of retries (so up to 4 attempts). */
   public static final int DEFAULT_MAX_RETRIES = 3;
 
+  /** Reset values at or above this many seconds are Unix epoch seconds, not a delay. */
+  private static final long EPOCH_SECONDS_THRESHOLD = 1_000_000_000L;
+
   private final int maxRetries;
   private final Duration initialBackoff;
   private final Duration maxBackoff;
@@ -177,6 +180,23 @@ public final class RetryPolicy {
     } catch (DateTimeParseException e) {
       return Optional.empty();
     }
+  }
+
+  /**
+   * Parses a vendor rate-limit reset header such as {@code X-RateLimit-Reset}: delay seconds
+   * (decimals allowed), Unix epoch seconds (values of at least {@code 1000000000}) or an HTTP-date.
+   *
+   * @param value header value, may be null
+   * @param now current time, used for epoch seconds and HTTP-dates
+   * @return the wait (never negative), or empty when absent or unparseable
+   */
+  public static Optional<Duration> parseRateLimitReset(String value, Instant now) {
+    Optional<Duration> d = parseRetryAfter(value, now);
+    if (d.isPresent() && d.get().getSeconds() >= EPOCH_SECONDS_THRESHOLD) {
+      Duration left = Duration.between(now, Instant.ofEpochMilli(d.get().toMillis()));
+      return Optional.of(left.isNegative() ? Duration.ZERO : left);
+    }
+    return d;
   }
 
   @Override

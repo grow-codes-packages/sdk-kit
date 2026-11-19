@@ -268,14 +268,14 @@ impl From<String> for LogInput {
 }
 
 /// Formats a timestamp as RFC 3339 UTC with nanoseconds (`…Z`).
-pub(crate) fn format_timestamp(t: SystemTime) -> String {
+pub fn format_timestamp(t: SystemTime) -> String {
     // Times before the epoch cannot be represented in the wire form; clamp them.
     let t = if t < UNIX_EPOCH { UNIX_EPOCH } else { t };
     humantime::format_rfc3339_nanos(t).to_string()
 }
 
 /// Parses an RFC 3339 timestamp (`Z` or numeric offset) or integer nanoseconds since the epoch.
-pub(crate) fn parse_timestamp(s: &str) -> Result<SystemTime> {
+pub fn parse_timestamp(s: &str) -> Result<SystemTime> {
     let s = s.trim();
     if let Ok(ns) = s.parse::<u64>() {
         return Ok(UNIX_EPOCH + Duration::from_nanos(ns));

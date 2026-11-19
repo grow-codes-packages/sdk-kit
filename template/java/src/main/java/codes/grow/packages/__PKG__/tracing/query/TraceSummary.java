@@ -31,7 +31,7 @@ public record TraceSummary(
    * @param spanCount span count
    */
   public TraceSummary {
-    traceId = TraceIds.normalizeTraceId(traceId);
+    traceId = TraceIds.traceId(traceId);
     rootServiceName = rootServiceName == null ? Optional.empty() : rootServiceName;
     rootName = rootName == null ? Optional.empty() : rootName;
   }

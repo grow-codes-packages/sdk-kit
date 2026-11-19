@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 from collections.abc import Callable
@@ -231,3 +232,31 @@ async def test_async_cache() -> None:
     handle = cache.watch("a", 1, lambda n, o: None)
     handle.stop()
     await handle.wait()
+
+
+async def test_async_cache_cancelled_refresh_can_be_retried() -> None:
+    store = InMemorySecretStore()
+    provider = AsyncInMemorySecretsProvider(store)
+    clock = Clock()
+    cache = sdk.AsyncSecretCache(provider, ttl_s=10, refresh_ahead_factor=0.5, clock=clock)
+    await cache.set("a", "1")
+    await cache.get("a")
+    entered = asyncio.Event()
+
+    async def hanging(*args: Any, **kw: Any) -> None:
+        entered.set()
+        await asyncio.Event().wait()  # cancelled below (plain asyncio.CancelledError)
+
+    real_get = provider.get
+    provider.get = hanging  # type: ignore[method-assign]
+    clock.now += 6
+    assert await cache.get_string("a") == "1"  # schedules a background refresh
+    await asyncio.wait_for(entered.wait(), 5)
+    for task in list(cache._tasks):
+        task.cancel()
+    await cache.wait_refreshes()
+    provider.get = real_get  # type: ignore[method-assign]
+    await provider.set("a", "2")
+    assert await cache.get_string("a") == "1"  # the cancelled refresh released the entry
+    await cache.wait_refreshes()
+    assert await cache.get_string("a") == "2"

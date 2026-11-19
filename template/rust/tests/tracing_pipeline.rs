@@ -235,6 +235,13 @@ async fn global_pipeline() {
     handle.shutdown().await.unwrap();
     handle.shutdown().await.unwrap();
     assert!(handle.is_shutdown());
+    // opentelemetry_sdk 0.31's async-runtime batch processor answers the shutdown request after
+    // the final flush and only then calls `exporter.shutdown()`, so the call can land a moment
+    // after `handle.shutdown()` returned (seen on loaded hosts). Wait for it with a deadline.
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while exporter.shutdown_calls() == 0 && std::time::Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
     assert_eq!(exporter.shutdown_calls(), 1);
     let err = handle.force_flush(None).await.unwrap_err();
     assert_eq!(err.code(), ErrorCode::Unavailable);

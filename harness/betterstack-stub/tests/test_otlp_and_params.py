@@ -253,6 +253,30 @@ def test_bind_parameter_errors(type_name: str, raw: str, code: int) -> None:
     assert info.value.code == code
 
 
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("plain", "plain"),
+        ("a\\\\b", "a\\b"),  # \\ -> backslash
+        ("tab\\there", "tab\there"),
+        ("line\\nbreak\\r", "line\nbreak\r"),
+        ("\\0\\b\\f\\a\\v", "\0\b\f\a\v"),
+        ('it\\\'s \\"q\\"', 'it\'s "q"'),
+        ("\\x", "x"),  # unknown escape: backslash dropped
+        ("end\\", "end\\"),  # trailing backslash kept
+    ],
+)
+def test_unescape_param_clickhouse_tsv_rules(raw: str, expected: str) -> None:
+    assert sql.unescape_param(raw) == expected
+
+
+def test_string_parameter_is_tsv_unescaped() -> None:
+    rows = sql.execute("SELECT {p:String} AS v", lambda k, t: ([], []), params={"p": "a\\tb\\\\c"})[2]
+    assert rows == [{"v": "a\tb\\c"}]
+    rows = sql.execute("SELECT {p:Nullable(String)} AS v", lambda k, t: ([], []), params={"p": "\\N"})[2]
+    assert rows == [{"v": None}]
+
+
 def test_identifier_parameter_and_limit_parameter() -> None:
     def resolver(kind: str, table: str) -> tuple[list[str], list[dict[str, Any]]]:
         assert (kind, table) == ("remote", "t1_x_logs")
