@@ -19,6 +19,7 @@ from grow___KEY_SNAKE__.testing import (
     init_memory_tracing,
     load_scenarios,
 )
+from grow___KEY_SNAKE__.testing import runner as r
 from grow___KEY_SNAKE__.testing.tracing_conformance import create_span_tree, tracing_ops
 
 SERVICE = "grow-conformance-svc"
@@ -48,6 +49,11 @@ def test_tracing_scenarios(scenario: dict[str, Any], factory: Any) -> None:
 
 def test_scenarios_present() -> None:
     assert {s["id"] for s in SCENARIOS} >= {"tracing.services", "tracing.tree"}
+
+
+def test_polled_tracing_list_services_is_registered() -> None:
+    # listServices is eventually consistent (Tempo, SkyWalking): the runner polls the step.
+    assert "listServices" in r._POLLED.get("tracing", set())
 
 
 def test_span_tree_with_event_mappings() -> None:

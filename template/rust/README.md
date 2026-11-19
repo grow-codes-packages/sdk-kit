@@ -31,3 +31,10 @@ async fn main() -> grow___KEY_SNAKE__::Result<()> {
 - MSRV 1.88. Licence Apache-2.0. Documentation: https://grow-codes-packages.github.io/__KEY__/
 
 Development: `make deps build lint test coverage license pack docs` (see `Makefile`).
+`make lint` also runs `cargo clippy --lib --no-default-features`: code that needs an optional
+feature (for example tonic TLS types behind `otlp-tls`) must sit behind
+`#[cfg(feature = "...")]`.
+<!-- @sdk-kit:if tracing -->
+For a service-built OTLP/gRPC exporter use `tracing::apply_grpc_tls`, which builds with and
+without `otlp-tls`, instead of naming tonic TLS types.
+<!-- @sdk-kit:endif -->

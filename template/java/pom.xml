@@ -11,7 +11,9 @@
   <packaging>jar</packaging>
 
   <name>Grow Codes SDK for __DISPLAY__</name>
+  <!-- @sdk-kit:keep description -->
   <description>Java client for __DISPLAY__ by Grow Codes: typed API, retries, timeouts, redaction and a conformance suite.</description>
+  <!-- @sdk-kit:endkeep -->
   <url>https://grow-codes-packages.github.io/__KEY__/</url>
   <inceptionYear>2026</inceptionYear>
 
@@ -90,13 +92,15 @@
     <dependency-plugin.version>3.9.0</dependency-plugin.version>
     <license-plugin.version>2.7.1</license-plugin.version>
     <gpg-plugin.version>3.2.8</gpg-plugin.version>
-    <central-publishing-plugin.version>0.9.0</central-publishing-plugin.version>
 
     <!-- coverage gates (SPEC section 7) -->
     <coverage.line.minimum>0.90</coverage.line.minimum>
     <coverage.branch.minimum>0.90</coverage.branch.minimum>
     <!-- extra JVM flags for surefire; JaCoCo prepends its agent through argLine -->
     <argLine>-Xshare:off</argLine>
+    <!-- service-owned properties (versions of the service's own dependencies) -->
+    <!-- @sdk-kit:keep properties -->
+    <!-- @sdk-kit:endkeep -->
   </properties>
 
   <dependencyManagement>
@@ -124,6 +128,9 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- service-owned BOM imports (for example the AWS SDK bom) -->
+      <!-- @sdk-kit:keep dependency-management -->
+      <!-- @sdk-kit:endkeep -->
     </dependencies>
   </dependencyManagement>
 
@@ -219,6 +226,10 @@
       <scope>test</scope>
     </dependency>
     <!-- @sdk-kit:endif -->
+    <!-- service-owned runtime and test dependencies (for example the AWS SDK, or a mock server
+         with <scope>test</scope>) -->
+    <!-- @sdk-kit:keep dependencies -->
+    <!-- @sdk-kit:endkeep -->
   </dependencies>
 
   <build>
@@ -275,6 +286,9 @@
             <!-- the Log4j plugin processor leaves other annotations unclaimed -->
             <arg>-Xlint:-processing</arg>
             <!-- @sdk-kit:endif -->
+            <!-- service-owned compiler arguments -->
+            <!-- @sdk-kit:keep compiler-args -->
+            <!-- @sdk-kit:endkeep -->
           </compilerArgs>
           <!-- @sdk-kit:if logging -->
           <!-- Log4j 2 appender plugin (logging/GrowLog4j2Appender): generate Log4j2Plugins.dat -->
@@ -449,11 +463,16 @@
           </licenseMerges>
         </configuration>
       </plugin>
+      <!-- service-owned build plugins -->
+      <!-- @sdk-kit:keep plugins -->
+      <!-- @sdk-kit:endkeep -->
     </plugins>
   </build>
 
   <profiles>
-    <!-- `mvn -Prelease deploy`: signed artifacts to Maven Central (CI only). -->
+    <!-- `mvn -P release verify`: builds and GPG-signs the jar, sources, javadoc and pom (CI only).
+         The sdk-kit release workflow (release-packages.yml) assembles the Maven Central bundle from
+         target/ and uploads it to the Central Portal API itself, so no deploy plugin is needed. -->
     <profile>
       <id>release</id>
       <build>
@@ -477,17 +496,6 @@
                 </configuration>
               </execution>
             </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.sonatype.central</groupId>
-            <artifactId>central-publishing-maven-plugin</artifactId>
-            <version>${central-publishing-plugin.version}</version>
-            <extensions>true</extensions>
-            <configuration>
-              <publishingServerId>central</publishingServerId>
-              <autoPublish>true</autoPublish>
-              <waitUntil>published</waitUntil>
-            </configuration>
           </plugin>
         </plugins>
       </build>

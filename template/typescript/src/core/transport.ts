@@ -269,6 +269,15 @@ export class HttpTransport {
     return this.#closed;
   }
 
+  /**
+   * Throws `CancelledError` (`"<operation>: client is closed"`, not retryable) once {@link close}
+   * was called (SPEC §2.4). Requests check this themselves; service methods that send no request
+   * (cached reads, local helpers) call it first.
+   */
+  ensureOpen(operation: string): void {
+    if (this.#closed) throw new CancelledError(`${operation}: client is closed`);
+  }
+
   /** Builds the absolute URL for a path and query. */
   buildUrl(path: string, query?: Readonly<Record<string, QueryValue>>): URL {
     let url: URL;
@@ -352,7 +361,7 @@ export class HttpTransport {
   async #request<T>(options: RequestOptions): Promise<TransportResponse<T>> {
     const method = (options.method ?? "GET").toUpperCase();
     const operation = options.operation ?? `${method} ${options.path.split("?")[0] ?? ""}`;
-    if (this.#closed) throw new CancelledError(`${operation}: client is closed`);
+    this.ensureOpen(operation);
     const signal = options.signal;
     if (signal?.aborted === true) throw new CancelledError(`${operation}: cancelled`);
 

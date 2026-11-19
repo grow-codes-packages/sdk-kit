@@ -30,6 +30,11 @@ file.
   in the file's comment syntax, within the first 10 lines. `sdk-kit sync` only ever overwrites
   files with this header. Files without it (README, NOTICE, LICENSE, release-please files, the
   skill, the client/config skeletons) are generated once and then belong to the service.
+- **Keep regions** (`@sdk-kit:keep <name>` … `@sdk-kit:endkeep`, see `docs/generate.md`) are the
+  service-owned parts of a generated file: sync keeps their bodies and the manifest hash ignores
+  them. Use one when services need to add to a generated file (service settings, extra
+  dependencies) instead of letting them take the whole file over. Never rename or remove a region
+  that services may have filled; add a new one.
 - **Tokens**: use only the SPEC §0 tokens (plus `__ENV__` in docs). `sdk-kit check` fails a repo
   that still contains one. Category-specific content goes into category folders (path rule) or
   `@sdk-kit:if` blocks; list paths that do not follow the segment rule in `template.json`.

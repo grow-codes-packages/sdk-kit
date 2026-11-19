@@ -52,7 +52,7 @@ pub use model::{
     normalize_trace_id_or_native, sort_spans, DependencyLink, Span, SpanEvent, SpanKind, SpanLink,
     SpanNode, SpanStatus, StatusCode, Trace, TraceSearchQuery, TraceSummary,
 };
-pub use otlp::{http_traces_endpoint, otlp_exporter};
+pub use otlp::{apply_grpc_tls, http_traces_endpoint, otlp_exporter, OtlpGrpcExporterBuilder};
 pub use propagation::{
     build_propagator, extract, extract_headers, inject, inject_context, inject_headers,
     inject_headers_context, B3Propagator, BoxedPropagator,

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from sdk_kit import __version__
+from sdk_kit import keep as keep_regions
 from sdk_kit.kit import Kit
 from sdk_kit.services import CATEGORIES, DEFAULT_PACKAGE_VERSION, LANGS, Service
 
@@ -82,7 +83,10 @@ def _parse_condition(expr: str, where: str) -> frozenset[str]:
 
 
 def apply_blocks(text: str, categories: tuple[str, ...] | frozenset[str], where: str = "<text>") -> str:
-    """Keep ``@sdk-kit:if`` blocks for present categories; always drop the marker lines."""
+    """Keep ``@sdk-kit:if`` blocks for present categories; always drop the ``if`` marker lines.
+
+    ``@sdk-kit:keep``/``@sdk-kit:endkeep`` lines are kept (see :mod:`sdk_kit.keep`) and checked.
+    """
     if "@sdk-kit:" not in text:
         return text
     present = set(categories)
@@ -90,9 +94,9 @@ def apply_blocks(text: str, categories: tuple[str, ...] | frozenset[str], where:
     open_line: int | None = None
     keep = True
     for number, line in enumerate(text.splitlines(keepends=True), start=1):
-        if not _MARKER_START_RE.match(line):
+        if not _MARKER_START_RE.match(line) or keep_regions.is_keep_marker(line):
             if keep:
-                out.append(line)
+                out.append(line)  # keep-region markers stay in the output (sync needs them)
             continue
         match = _MARKER_RE.match(line.rstrip("\r\n"))
         if match is None:
@@ -113,7 +117,13 @@ def apply_blocks(text: str, categories: tuple[str, ...] | frozenset[str], where:
             keep = True
     if open_line is not None:
         raise RenderError(f"{where}:{open_line}: @sdk-kit:if is never closed")
-    return "".join(out)
+    result = "".join(out)
+    try:
+        keep_regions.parse(text, where)  # line numbers of the template file
+        keep_regions.parse(result, f"{where} (rendered)")  # a region cut by an @sdk-kit:if block
+    except keep_regions.KeepError as exc:
+        raise RenderError(str(exc)) from exc
+    return result
 
 
 def is_generated_text(text: str) -> bool:

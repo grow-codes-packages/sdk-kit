@@ -11,7 +11,7 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from typing import Any
 
 from .._core.env import to_seconds
-from .._core.errors import NotFoundError, ValidationError
+from .._core.errors import CancelledError, NotFoundError, ValidationError
 from .._core.resources import ResourceRegistry
 from .parse import encode_value, env_var_name, parse_boolean, parse_json, parse_number
 from .types import DeleteOptions, GetOptions, SecretMetadata, SecretValue, SetOptions
@@ -54,12 +54,30 @@ class BaseSecretsProvider(abc.ABC):
     * ``_fetch_metadata(name, GetOptions) -> SecretMetadata | None``
 
     Watchers started with :meth:`watch` are stopped by :meth:`close` and, when ``owner`` is
-    given (the client's registry), by ``client.close()``.
+    given (the client's registry), by ``client.close()``. After :meth:`close` every call
+    raises :class:`CancelledError` ("<operation>: client is closed") before any primitive runs.
     """
+
+    #: Set by :meth:`close` (class default so subclasses skipping ``__init__`` still work).
+    _provider_closed: bool = False
 
     def __init__(self, *, owner: ResourceRegistry | None = None) -> None:
         self._watchers = ResourceRegistry()
         self._owner = owner
+
+    # ----------------------------------------------------------------- closed state
+    @property
+    def closed(self) -> bool:
+        """True once :meth:`close` was called."""
+        return self._provider_closed
+
+    def ensure_open(self, op: str) -> None:
+        """Raise :class:`CancelledError` ("<op>: client is closed") after :meth:`close`.
+
+        Service methods that do not go through the base operations can call it first.
+        """
+        if self._provider_closed:
+            raise CancelledError(f"{op}: client is closed")
 
     # ----------------------------------------------------------------- primitives
     @abc.abstractmethod
@@ -82,6 +100,7 @@ class BaseSecretsProvider(abc.ABC):
         self, name: str, *, version: str | None = None, path: str | None = None
     ) -> SecretValue | None:
         """The secret, or ``None`` when it does not exist."""
+        self.ensure_open("secrets.get")
         return self._fetch_secret(name, GetOptions(version=version, path=path))
 
     def get_string(
@@ -134,6 +153,7 @@ class BaseSecretsProvider(abc.ABC):
 
     def get_all(self, path: str | None = None) -> dict[str, SecretValue]:
         """Every secret directly under ``path`` (non-recursive), keyed by name."""
+        self.ensure_open("secrets.get_all")
         out: dict[str, SecretValue] = {}
         for meta in self.list(path):
             value = self._fetch_secret(meta.name, GetOptions(path=meta.path))
@@ -143,11 +163,13 @@ class BaseSecretsProvider(abc.ABC):
 
     def list(self, prefix: str | None = None) -> builtins.list[SecretMetadata]:
         """Metadata of the secrets under ``prefix``, sorted by name."""
+        self.ensure_open("secrets.list")
         return sorted(self._list_secrets(prefix), key=lambda m: m.name)
 
     def metadata(
         self, name: str, *, version: str | None = None, path: str | None = None
     ) -> SecretMetadata | None:
+        self.ensure_open("secrets.metadata")
         return self._fetch_metadata(name, GetOptions(version=version, path=path))
 
     # ----------------------------------------------------------------- writes
@@ -162,6 +184,7 @@ class BaseSecretsProvider(abc.ABC):
         description: str | None = None,
     ) -> str:
         """Store ``value`` (str, bytes, or JSON-encoded object); returns the new version."""
+        self.ensure_open("secrets.set")
         data = encode_value(value)
         opts = SetOptions(path=path, cas=cas, tags=tags, description=description)
         return self._put_secret(name, data, opts)
@@ -175,6 +198,7 @@ class BaseSecretsProvider(abc.ABC):
         permanent: bool = False,
     ) -> None:
         """Delete a secret; :class:`NotFoundError` when it does not exist."""
+        self.ensure_open("secrets.delete")
         self._remove_secret(name, DeleteOptions(path=path, versions=versions, permanent=permanent))
 
     # ----------------------------------------------------------------- helpers
@@ -194,6 +218,7 @@ class BaseSecretsProvider(abc.ABC):
         before anything is set). Existing variables are kept unless ``override``. ``environ``
         defaults to :data:`os.environ`.
         """
+        self.ensure_open("secrets.load_env")
         values: dict[str, tuple[str, SecretValue]] = {}
         if isinstance(source, str):
             for name, value in self.get_all(source).items():
@@ -214,6 +239,7 @@ class BaseSecretsProvider(abc.ABC):
         path: str | None = None,
     ) -> WatchHandle:
         """Poll ``name`` every ``interval_s`` and call ``on_change(new, old)`` on change."""
+        self.ensure_open("secrets.watch")
         handle = WatchHandle(
             lambda: self.get(name, version=version, path=path),
             _check_interval(interval_s),
@@ -227,16 +253,36 @@ class BaseSecretsProvider(abc.ABC):
         return handle.start()
 
     def close(self) -> None:
-        """Stop every watcher started by this provider (idempotent)."""
+        """Stop every watcher started by this provider; later calls raise CANCELLED (idempotent)."""
+        self._provider_closed = True
         self._watchers.stop_all()
 
 
 class AsyncBaseSecretsProvider(abc.ABC):
-    """Async counterpart of :class:`BaseSecretsProvider` (async primitives)."""
+    """Async counterpart of :class:`BaseSecretsProvider` (async primitives).
+
+    After :meth:`aclose` every call raises :class:`CancelledError` ("client is closed").
+    """
+
+    _provider_closed: bool = False
 
     def __init__(self, *, owner: ResourceRegistry | None = None) -> None:
         self._watchers = ResourceRegistry()
         self._owner = owner
+
+    # ----------------------------------------------------------------- closed state
+    @property
+    def closed(self) -> bool:
+        """True once :meth:`aclose` was called."""
+        return self._provider_closed
+
+    def ensure_open(self, op: str) -> None:
+        """Raise :class:`CancelledError` ("<op>: client is closed") after :meth:`aclose`.
+
+        Service methods that do not go through the base operations can call it first.
+        """
+        if self._provider_closed:
+            raise CancelledError(f"{op}: client is closed")
 
     @abc.abstractmethod
     async def _fetch_secret(self, name: str, opts: GetOptions) -> SecretValue | None: ...
@@ -256,6 +302,7 @@ class AsyncBaseSecretsProvider(abc.ABC):
     async def get(
         self, name: str, *, version: str | None = None, path: str | None = None
     ) -> SecretValue | None:
+        self.ensure_open("secrets.get")
         return await self._fetch_secret(name, GetOptions(version=version, path=path))
 
     async def get_string(
@@ -306,6 +353,7 @@ class AsyncBaseSecretsProvider(abc.ABC):
         return out
 
     async def get_all(self, path: str | None = None) -> dict[str, SecretValue]:
+        self.ensure_open("secrets.get_all")
         out: dict[str, SecretValue] = {}
         for meta in await self.list(path):
             value = await self._fetch_secret(meta.name, GetOptions(path=meta.path))
@@ -314,11 +362,13 @@ class AsyncBaseSecretsProvider(abc.ABC):
         return out
 
     async def list(self, prefix: str | None = None) -> builtins.list[SecretMetadata]:
+        self.ensure_open("secrets.list")
         return sorted(await self._list_secrets(prefix), key=lambda m: m.name)
 
     async def metadata(
         self, name: str, *, version: str | None = None, path: str | None = None
     ) -> SecretMetadata | None:
+        self.ensure_open("secrets.metadata")
         return await self._fetch_metadata(name, GetOptions(version=version, path=path))
 
     async def set(
@@ -331,6 +381,7 @@ class AsyncBaseSecretsProvider(abc.ABC):
         tags: Mapping[str, str] | None = None,
         description: str | None = None,
     ) -> str:
+        self.ensure_open("secrets.set")
         data = encode_value(value)
         opts = SetOptions(path=path, cas=cas, tags=tags, description=description)
         return await self._put_secret(name, data, opts)
@@ -343,6 +394,7 @@ class AsyncBaseSecretsProvider(abc.ABC):
         versions: Sequence[str] | None = None,
         permanent: bool = False,
     ) -> None:
+        self.ensure_open("secrets.delete")
         await self._remove_secret(
             name, DeleteOptions(path=path, versions=versions, permanent=permanent)
         )
@@ -356,6 +408,7 @@ class AsyncBaseSecretsProvider(abc.ABC):
         environ: MutableMapping[str, str] | None = None,
     ) -> dict[str, str]:
         """See :meth:`BaseSecretsProvider.load_env`."""
+        self.ensure_open("secrets.load_env")
         values: dict[str, tuple[str, SecretValue]] = {}
         if isinstance(source, str):
             for name, value in (await self.get_all(source)).items():
@@ -376,6 +429,7 @@ class AsyncBaseSecretsProvider(abc.ABC):
         path: str | None = None,
     ) -> AsyncWatchHandle:
         """Start an asyncio task polling ``name`` (call from a running event loop)."""
+        self.ensure_open("secrets.watch")
         handle = AsyncWatchHandle(
             lambda: self.get(name, version=version, path=path),
             _check_interval(interval_s),
@@ -389,5 +443,6 @@ class AsyncBaseSecretsProvider(abc.ABC):
         return handle.start()
 
     async def aclose(self) -> None:
-        """Stop every watcher started by this provider (idempotent)."""
+        """Stop every watcher started by this provider; later calls raise CANCELLED (idempotent)."""
+        self._provider_closed = True
         self._watchers.stop_all()

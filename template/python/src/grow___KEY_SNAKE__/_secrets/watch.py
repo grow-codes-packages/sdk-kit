@@ -10,6 +10,7 @@ import threading
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from .._core.errors import CancelledError
 from .types import SecretValue
 
 __all__ = ["WatchHandle", "AsyncWatchHandle", "OnChange", "OnError"]
@@ -39,6 +40,8 @@ class WatchHandle:
     The first successful fetch is the baseline; later fetches whose version (or SHA-256 when
     unversioned) differ call ``on_change(new, old)``, including deletion (``new is None``).
     Errors (from fetching or from ``on_change``) go to ``on_error`` and polling continues.
+    A :class:`CancelledError` from fetching (the provider or client was closed) ends the
+    watcher quietly (:attr:`stopped` becomes true), like the async watcher.
     """
 
     def __init__(
@@ -80,7 +83,12 @@ class WatchHandle:
         while not self._stop.is_set():
             try:
                 new = self._fetch()
+            except CancelledError:
+                self._stop.set()  # closed provider/client: CancelledError is a BaseException
+                break
             except Exception as exc:  # noqa: BLE001 - reported to on_error
+                if self._stop.is_set():
+                    break
                 _report(self._on_error, exc)
             else:
                 if have_baseline and _fingerprint(new) != _fingerprint(old):
@@ -158,6 +166,7 @@ class AsyncWatchHandle:
             try:
                 new = await self._fetch()
             except asyncio.CancelledError:
+                self._stopped = True  # task cancelled, or the provider/client was closed
                 raise
             except Exception as exc:  # noqa: BLE001 - reported to on_error
                 await self._report(exc)

@@ -45,7 +45,7 @@ Sources:
 | SQL API: `POST` the query as body, HTTP basic auth, `?output_format_pretty_row_numbers=0` accepted | B |
 | sources `remote(<t>_logs)` (hot), `remote(<t>_spans)`, `remote(<t>_metrics)`, `s3Cluster(primary, <t>_s3)` with `_row_type` (cold), `UNION ALL` of hot + cold, columns `dt` + `raw` | B |
 | `WHERE raw LIKE '%text%'`, `JSONExtract(raw, 'key', 'Nullable(String)')`, `ORDER BY dt`, `LIMIT`, `toDateTime64(epoch, 0, 'UTC')`, `BETWEEN`, `FORMAT JSONEachRow / JSON / CSV / TSV`, `SETTINGS output_format_json_array_of_rows = 1` | B |
-| ClickHouse HTTP conventions: `?query=` + body concatenation, `X-ClickHouse-User`/`X-ClickHouse-Key` or `user`/`password` parameters, `default_format`, `{name:Type}` placeholders bound from `param_<name>`, `SELECT` without `FROM`, `/ping` → `Ok.`, error body `Code: N. DB::Exception: … (NAME)`, `X-ClickHouse-Exception-Code`, `X-ClickHouse-Format`, default output `TabSeparated`, (U)Int64 quoted in JSON formats | E |
+| ClickHouse HTTP conventions: `?query=` + body concatenation, `X-ClickHouse-User`/`X-ClickHouse-Key` or `user`/`password` parameters, `default_format`, `{name:Type}` placeholders bound from `param_<name>` (values decoded in the escaped TabSeparated format: `\\` `\t` `\n` `\r` …), `SELECT` without `FROM`, `/ping` → `Ok.`, error body `Code: N. DB::Exception: … (NAME)`, `X-ClickHouse-Exception-Code`, `X-ClickHouse-Format`, default output `TabSeparated`, (U)Int64 quoted in JSON formats | E |
 
 ## Stub choices (not verifiable from public docs — confirm with a live source)
 

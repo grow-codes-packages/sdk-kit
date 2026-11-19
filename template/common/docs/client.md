@@ -6,6 +6,8 @@
 it between threads/tasks and close it on shutdown. Service functions hang off the client (see
 [Functions](functions.md)).
 
+<!-- @sdk-kit:keep functions — service-owned: client functions and their __DISPLAY__ behaviour; kept by "sdk-kit sync" -->
+
 | Function | Returns | Notes |
 | - | - | - |
 | constructor / `create` / `new` | client | validates the config (`CONFIG` error) |
@@ -17,7 +19,11 @@ it between threads/tasks and close it on shutdown. Service functions hang off th
 
 `status` is `ok`, `degraded`, `unhealthy`, `unreachable` (network error) or the vendor's word.
 
+<!-- @sdk-kit:endkeep -->
+
 ## Create, use and close
+
+<!-- @sdk-kit:keep examples — service-owned: create/use/close examples per language; kept by "sdk-kit sync" -->
 
 === "TypeScript"
 
@@ -112,11 +118,18 @@ it between threads/tasks and close it on shutdown. Service functions hang off th
     } // close() is idempotent
     ```
 
+<!-- @sdk-kit:endkeep -->
+
 ## Lifecycle rules
 
 - The client is safe for concurrent use. Reuse it: it keeps a connection pool.
 - `close()` flushes queued work (for example log batches) within the configured deadline and is
-  safe to call more than once. Calls after `close()` fail with a clear error.
+  safe to call more than once. Any call on a closed client fails with `CANCELLED`
+  (`"<operation>: client is closed"`).
 - Each language also offers its idiomatic scope: TypeScript `try/finally`, Rust `close().await`
   (plus best-effort `Drop`), Go `defer client.Close()`, Python `with`/`async with`, Java
   try-with-resources.
+
+<!-- @sdk-kit:keep service — service-owned: further __DISPLAY__ client sections; kept by "sdk-kit sync" -->
+
+<!-- @sdk-kit:endkeep -->

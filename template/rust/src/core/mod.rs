@@ -24,6 +24,6 @@ pub use redact::REDACTED;
 pub use retry::{RandomSource, RetryPolicy};
 pub use secret::Secret;
 pub use transport::{
-    build_reqwest_client, reqwest_client_builder, user_agent_for, CancellationToken, HttpTransport,
-    Method, Response,
+    build_reqwest_client, reqwest_client_builder, user_agent_for, CancellationToken, ErrorResponse,
+    HttpTransport, Method, Response,
 };

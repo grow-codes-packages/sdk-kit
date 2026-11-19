@@ -428,4 +428,20 @@ class CoreUnitsTest {
     cancelled.cancel(true);
     assertThat(cancelled.isCancelled()).isTrue();
   }
+
+  @Test
+  void quietJulKeepsSilencedLoggersReachable() {
+    String name = "grow.test.quiet." + System.nanoTime();
+    QuietJul.silence(name);
+    // JUL holds loggers weakly: without the helper's strong reference a GC would drop the level
+    for (int i = 0; i < 3; i++) {
+      System.gc();
+    }
+    assertThat(java.util.logging.Logger.getLogger(name).getLevel())
+        .isEqualTo(java.util.logging.Level.OFF);
+    assertThat(QuietJul.level(name, null).getLevel()).isNull();
+    assertThat(QuietJul.level(name, java.util.logging.Level.FINE))
+        .isSameAs(java.util.logging.Logger.getLogger(name));
+    assertThatThrownBy(() -> QuietJul.level(null, null)).isInstanceOf(NullPointerException.class);
+  }
 }

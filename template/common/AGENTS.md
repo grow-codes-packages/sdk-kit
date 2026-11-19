@@ -41,7 +41,14 @@ service modules — is service code.
   **Do not edit it here.** Change sdk-kit (template), release it, then run `sdk-kit sync` in this
   repository. A local edit is detected (`.sdk-kit.json` keeps a SHA-256 per file) and blocks the
   next sync until it is reverted or forced.
-- To take over a generated file for good, delete its header line; sync then leaves it alone.
+- **Keep regions** are the service-owned parts of a generated file: the lines between
+  `@sdk-kit:keep <name>` and `@sdk-kit:endkeep` (in the file's comment syntax). Edit them freely —
+  sync keeps their content and the SHA-256 ignores it. The sections below marked this way, the
+  service settings and examples in `docs/configuration.md` and `docs/client.md`, the service
+  sections of `docs/troubleshooting.md` and the service dependencies in `java/pom.xml` are such
+  regions. Never edit outside them, and never remove or rename a marker line.
+- To take over a generated file for good, delete its header line; sync then leaves it alone. Prefer
+  a keep region: a taken-over file no longer gets sdk-kit fixes.
 - Never edit `conformance/` or `.sdk-kit.json` by hand.
 - `sdk-kit check` (run in CI) verifies that the required files, badges and workflows are present.
 
@@ -131,6 +138,10 @@ Prefer the `make` targets; they are what CI runs.
 - The release workflow publishes to npm, crates.io, PyPI and Maven Central; Go is published by its
   tag. Publishing credentials live only in the release environment of the GitHub repository.
 
+<!-- @sdk-kit:keep service-specifics — service-owned "## __DISPLAY__ specifics" (fixture, binding parity decisions, licence notes); kept by "sdk-kit sync" -->
+
+<!-- @sdk-kit:endkeep -->
+
 ## Rules for agents
 
 - Keep secrets out of code, tests, fixtures, logs and commit messages. Credentials are always wrapped
@@ -142,3 +153,15 @@ Prefer the `make` targets; they are what CI runs.
 - Before you push: `make lint coverage` for every language you touched (or all of them for shared
   changes), and `make test-docker LANGS="<lang>"` when behaviour against the service changed.
 - Update the README function overview, `docs/` and the skill file when the public API changes.
+
+### Language notes
+
+- **Vendor error remapping** goes through the transport's error-mapper hook so `onError` hooks and
+  retries see the mapped error: TypeScript `classifyError`, Rust `HttpTransport::with_error_mapper`
+  / `RequestBuilder::map_error`, Go `setErrorMapper` / `request.MapError`, Python `error_mapper`,
+  Java `TransportConfig.errorMapper`. Do not catch and rethrow after the transport.
+- **Rust**: keep `cargo clippy --lib --no-default-features -- -D warnings` clean (`make lint` runs
+  it). A service's own OTLP/gRPC exporter takes TLS from
+  `tracing::apply_grpc_tls(builder, endpoint, &TlsConfig)`, which works with and without the
+  `otlp-tls` feature (an `https` endpoint without it is a `CONFIG` error); do not write own
+  `#[cfg(feature = "otlp-tls")]` TLS code.

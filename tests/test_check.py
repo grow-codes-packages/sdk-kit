@@ -107,6 +107,8 @@ def test_check_skips_ignored_dirs_and_binaries(repo: Path) -> None:
     write(repo / "typescript" / "node_modules" / "pkg" / "x.js", "__KEY__")
     write(repo / ".git" / "HEAD", "__KEY__")
     write(repo / "img.bin", b"\0__KEY__")
+    write(repo / "python" / "build" / "integration-venv" / "pyvenv.cfg", "home = /usr\n")
+    write(repo / "python" / "build" / "integration-venv" / "lib" / "x.py", "__VERSION__")
     (repo / "go" / "link").symlink_to("missing-target")
     assert check(repo) == []
 
