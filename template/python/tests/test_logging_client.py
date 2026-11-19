@@ -11,6 +11,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from grow___KEY_SNAKE__._core.redaction import Secret
 from grow___KEY_SNAKE__._logging import (
     DEFAULT_REDACT_KEYS,
+    DEFAULT_REDACTION,
     AsyncBatchingLogClient,
     AsyncLogClient,
     BatchingLogClient,
@@ -120,6 +121,16 @@ def test_default_redaction_and_opt_out() -> None:
     raw.flush(5)
     assert dict(raw_exporter.records[0].attributes) == {"password": "hunter2"}
     raw.close()
+
+
+def test_default_redaction_is_public() -> None:
+    from grow___KEY_SNAKE__._logging import _client
+
+    assert isinstance(DEFAULT_REDACTION, RedactionProcessor)
+    assert _client._DEFAULT_REDACTION is DEFAULT_REDACTION  # old private name still works
+    client, _ = make_client()
+    assert client.redaction is DEFAULT_REDACTION
+    client.close()
 
 
 def test_send_batch_stats_and_context_manager() -> None:

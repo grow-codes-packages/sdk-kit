@@ -9,6 +9,7 @@ HTTP semantic-convention attributes are set; URLs pass through ``redact_url``.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 from collections.abc import Awaitable, Callable, Iterable, Iterator, MutableMapping
 from typing import TYPE_CHECKING, Any
@@ -122,6 +123,8 @@ class TracingASGIMiddleware:
 
             try:
                 await self.app(scope, receive, traced_send)
+            except asyncio.CancelledError:
+                raise  # a cancelled request (client gone) is not a span error
             except Exception as exc:
                 mark_span_error(span, exc)
                 raise

@@ -55,11 +55,17 @@ export function isSensitiveHeader(name: string): boolean {
   return SENSITIVE_HEADERS.has(n) || SENSITIVE_HEADER_PARTS.some((p) => n.includes(p));
 }
 
+/**
+ * Names ending in `path` (`secretPath`, `secret_path`, `token-path`) name a location, not a
+ * credential: they are not redacted by the built-in parts (`extraKeys` still apply).
+ */
+const PATH_NAME = /path$/;
+
 /** True when a field or query parameter with this name must be redacted (SPEC §2.6). */
 export function isSensitiveField(name: string, extraKeys: readonly string[] = []): boolean {
   const n = name.toLowerCase();
   return (
-    SENSITIVE_FIELD_PARTS.some((p) => n.includes(p)) ||
+    (!PATH_NAME.test(n) && SENSITIVE_FIELD_PARTS.some((p) => n.includes(p))) ||
     extraKeys.some((k) => k !== "" && n.includes(k.toLowerCase()))
   );
 }

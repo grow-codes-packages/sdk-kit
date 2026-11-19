@@ -59,6 +59,17 @@ Use the language folder as the scope (`typescript`, `rust`, `go`, `python`, `jav
 touches one package only. A breaking change is marked with `!` (`feat!: …`) or a
 `BREAKING CHANGE:` footer.
 
+**PR titles are Conventional Commits**, e.g. `feat: add KV v2 metadata (GRO-123)` or
+`fix(go): map HTTP 412 to ErrConflict (GRO-124)`. Pull requests are squash-merged and the squash
+commit takes the PR title, so the title is what release-please reads; a title such as
+`GRO-123: …` is ignored and nothing gets released. Allowed types: `feat`, `fix`, `perf`, `revert`,
+`deps`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`. The `pr-title` CI job checks it.
+
+`make release-check` (root, or per language folder) verifies that every package can be published:
+release-please config and manifest, version files, registry metadata and a dry-run publish
+(`npm publish --dry-run`, `cargo publish --dry-run`, `twine check`, the Maven `release` profile
+without signing, Go module checks). CI runs the language part after `make pack`.
+
 ## Pull requests
 
 - Keep pull requests focused; one topic per pull request.

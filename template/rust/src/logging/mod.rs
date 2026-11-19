@@ -22,7 +22,7 @@ mod batch;
 mod client;
 mod exporter;
 mod query;
-mod record;
+pub mod record;
 mod redaction;
 
 #[cfg(feature = "log-bridge")]
@@ -39,7 +39,9 @@ pub use query::{
     poll_tail, wait_for_log, LogQueryClient, LogSearchResult, RecordCallback, RecordPredicate,
     SearchOptions, SortOrder, TailHandle, TailOptions, WaitOptions,
 };
-pub use record::{AttrValue, Attributes, LogInput, LogRecord, Severity};
+pub use record::{
+    format_timestamp, parse_timestamp, AttrValue, Attributes, LogInput, LogRecord, Severity,
+};
 pub use redaction::{RedactionProcessor, DEFAULT_REDACT_KEYS};
 
 #[cfg(feature = "log-bridge")]

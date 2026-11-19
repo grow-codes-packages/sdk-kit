@@ -154,6 +154,57 @@ fn otel_value_conversion() {
 }
 
 #[test]
+fn native_ids_and_explicit_settings() {
+    use sdk::tracing::{normalize_span_id_or_native, normalize_trace_id_or_native};
+    assert_eq!(
+        normalize_trace_id_or_native("0xABC").unwrap(),
+        "00000000000000000000000000000abc"
+    );
+    assert_eq!(
+        normalize_trace_id_or_native(" 2.58.17000000000000001 ").unwrap(),
+        "2.58.17000000000000001"
+    );
+    assert_eq!(
+        normalize_trace_id_or_native(&"a".repeat(40)).unwrap(),
+        "a".repeat(40)
+    );
+    assert_eq!(
+        normalize_span_id_or_native("1F").unwrap(),
+        "000000000000001f"
+    );
+    assert_eq!(normalize_span_id_or_native("seg-1").unwrap(), "seg-1");
+    for bad in ["", "  ", "0x"] {
+        assert_eq!(
+            normalize_trace_id_or_native(bad).map_err(|e| e.code()),
+            if bad == "0x" {
+                Ok("0x".to_owned())
+            } else {
+                Err(sdk::ErrorCode::Validation)
+            },
+            "{bad:?}"
+        );
+    }
+    assert_eq!(
+        normalize_trace_id_or_native("0").unwrap_err().code(),
+        sdk::ErrorCode::Validation
+    );
+
+    let c = TracingConfig::new("svc");
+    assert_eq!(c.explicit_protocol(), None);
+    assert_eq!(c.explicit_propagators(), None);
+    let c = c
+        .with_protocol(Protocol::HttpProtobuf)
+        .with_propagators(vec![PropagatorKind::TraceContext, PropagatorKind::Baggage]);
+    assert_eq!(c.explicit_protocol(), Some(Protocol::HttpProtobuf));
+    assert_eq!(c.explicit_propagators().map(<[_]>::len), Some(2));
+    let mut c = TracingConfig::new("svc");
+    c.protocol = Protocol::Grpc;
+    c.propagators = vec![PropagatorKind::B3];
+    assert_eq!(c.explicit_protocol(), Some(Protocol::Grpc));
+    assert_eq!(c.explicit_propagators(), Some(&[PropagatorKind::B3][..]));
+}
+
+#[test]
 fn id_normalization() {
     assert_eq!(
         normalize_trace_id("ABCDEF0123456789").unwrap(),

@@ -16,6 +16,9 @@ use crate::core::{Error, Result};
 use crate::testing::runner::{CategoryHandler, Scenario, ScenarioSession, StepOutput, Vars};
 use crate::tracing::{otel_value, TraceQueryClient, TracingHandle, WaitForTraceOptions};
 
+/// Delay between `listServices` lookups while waiting for the service name.
+const LIST_SERVICES_INTERVAL: Duration = Duration::from_millis(500);
+
 /// What a tracing factory returns: the pipeline under test and its query client, if any.
 pub struct TracingTarget {
     /// Tracing pipeline (spans are created with its tracer; it is flushed, not shut down).
@@ -141,7 +144,7 @@ impl TracingSession {
 
 #[async_trait]
 impl ScenarioSession for TracingSession {
-    async fn run(&mut self, op: &str, args: &Value, _vars: &Vars) -> Result<StepOutput> {
+    async fn run(&mut self, op: &str, args: &Value, vars: &Vars) -> Result<StepOutput> {
         let handle = &self.target.handle;
         match op {
             "span" => {
@@ -172,8 +175,27 @@ impl ScenarioSession for TracingSession {
                 Ok(StepOutput::json(serde_json::to_value(&trace)?).with_count(count))
             }
             "listServices" => {
-                let services = self.query()?.list_services().await?;
-                Ok(StepOutput::json(serde_json::to_value(services)?))
+                // Backends index service names late (Tempo, SkyWalking: ~30 s), so poll until
+                // `serviceName` shows up or `timeoutMs` (default 60 s) passes; the step's
+                // expectation then judges the last answer.
+                let query = self.query()?;
+                let wanted = vars.get("serviceName").map(str::to_owned);
+                let timeout = Duration::from_millis(
+                    args.get("timeoutMs")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(60_000),
+                );
+                let deadline = tokio::time::Instant::now() + timeout;
+                loop {
+                    let services = query.list_services().await?;
+                    let found = wanted
+                        .as_deref()
+                        .is_none_or(|w| services.iter().any(|s| s == w));
+                    if found || tokio::time::Instant::now() >= deadline {
+                        return Ok(StepOutput::json(serde_json::to_value(services)?));
+                    }
+                    tokio::time::sleep(LIST_SERVICES_INTERVAL).await;
+                }
             }
             other => Err(Error::unsupported(format!("unknown tracing op {other:?}"))),
         }

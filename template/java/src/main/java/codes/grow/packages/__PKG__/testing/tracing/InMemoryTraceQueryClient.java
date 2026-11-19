@@ -57,7 +57,7 @@ public final class InMemoryTraceQueryClient implements TraceQueryClient {
 
   @Override
   public Optional<Trace> getTrace(String traceId) {
-    String id = TraceIds.normalizeTraceId(traceId);
+    String id = TraceIds.traceId(traceId);
     List<Span> spans = new ArrayList<>();
     for (Span s : source.get()) {
       if (s.traceId().equals(id)) {

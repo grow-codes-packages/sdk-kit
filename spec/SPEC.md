@@ -82,6 +82,7 @@ Root `Makefile` targets: `build`, `lint`, `test` (unit), `coverage`, `test-docke
 | Bytes | `Uint8Array` | `Vec<u8>` / `bytes::Bytes` | `[]byte` | `bytes` | `byte[]` |
 | Async | every I/O method returns `Promise`, accepts `{ signal?: AbortSignal }` | `async fn` on tokio; feature `blocking` adds `blocking::<Service>Client` | sync methods with `ctx` (callers use goroutines) | `<Service>Client` (sync) **and** `Async<Service>Client` (async) with the same methods | sync methods **and** `…Async` variants returning `CompletableFuture<T>` |
 | Close | `close(): Promise<void>` | `async fn close(&self)` + `Drop` best effort | `Close() error` | `close()` / `aclose()`, context managers | `AutoCloseable.close()` |
+| Closed client | any call after `close()` rejects with `CancelledError` | `Err(Error::Cancelled{..})` | `ErrCancelled` | raises `CancelledError` | throws `CancelledException` |
 
 Field names in wire/JSON models (conformance, normalized records) are always `camelCase`.
 
@@ -114,7 +115,7 @@ Base error `<Service>Error` (Go: `*Error`; Rust: `enum Error` with `code()`), fi
 | `UNAVAILABLE` | `UnavailableError` | network error, DNS, connection refused/reset, HTTP 500, 502, 503 | true |
 | `TIMEOUT` | `TimeoutError` | connect/request/total deadline exceeded, HTTP 408, 504 | true |
 | `UNSUPPORTED` | `UnsupportedError` | capability the service/deployment does not offer (HTTP 501, missing API, enterprise-only) | false |
-| `CANCELLED` | `CancelledError` | caller cancelled (AbortSignal, ctx cancel, task cancel, future cancel) | false |
+| `CANCELLED` | `CancelledError` | caller cancelled (AbortSignal, ctx cancel, task cancel, future cancel); any call on a closed client ("client is closed") | false |
 
 Go: `type Error struct{ Code ErrorCode; Message string; HTTPStatus int; RequestID string; Retryable bool; RetryAfter time.Duration; Err error }`,
 sentinels `ErrConfig, ErrAuthentication, ErrPermissionDenied, ErrNotFound, ErrConflict, ErrRateLimited, ErrValidation, ErrUnavailable, ErrTimeout, ErrUnsupported, ErrCancelled`
@@ -219,6 +220,12 @@ HealthStatus { healthy: boolean; status: string /* "ok" | "degraded" | "unhealth
 `status="unreachable"` on network errors and the vendor's word otherwise. It throws only for
 `CANCELLED` and `CONFIG`. Service-specific modules hang off the client as properties/accessors
 (`client.kv`, `client.transit()`, Go `client.KV()`), defined in each service ticket.
+
+**Closed client.** After `close()` (or `aclose()`, context-manager exit, `Close()`), every call on
+the client and on its service modules — `health()` included — fails with `CANCELLED`
+(`CancelledError` / `ErrCancelled` / `CancelledException`, message `"<operation>: client is closed"`,
+not retryable) before any network I/O. `close()` itself stays idempotent and never fails on a
+second call. Calls already in flight when `close()` starts may finish or fail with `CANCELLED`.
 
 ### 2.5 Hooks and logger
 
@@ -539,7 +546,7 @@ Format (`spec/schemas/scenario.schema.json`):
 | Runtime | Node ≥ 22.12 (LTS), ESM + CJS via tsup, `"type": "module"`, exports map | stable, MSRV **1.88**, edition 2021 | Go 1.26 + 1.27 (go.mod `go 1.26`) | Python ≥ 3.10, hatchling | Java 17 bytecode (`--release 17`), tested on 17/21/25, Maven |
 | HTTP | global `fetch` + `undici` (MIT) for dispatcher/TLS/proxy | `reqwest` 0.12 (`rustls-tls`, `json`, `gzip`), `tokio` | `net/http` | `httpx` | `java.net.http` |
 | JSON | native | `serde`, `serde_json` | `encoding/json` | `json` | Jackson `jackson-databind` |
-| Other deps | `@opentelemetry/api`, `@opentelemetry/sdk-trace-base`, `@opentelemetry/sdk-trace-node`, `@opentelemetry/exporter-trace-otlp-http`, `@opentelemetry/exporter-trace-otlp-grpc`, `@opentelemetry/resources`, `@opentelemetry/semantic-conventions`, `@opentelemetry/core` (tracing only) | `thiserror`, `zeroize`, `rand`, `url`, `bytes`, `futures`, `async-trait`, `tracing`, `opentelemetry` + `opentelemetry_sdk` + `opentelemetry-otlp` (tracing), `tracing-subscriber`, `log`, `tower`, `reqwest-middleware` (optional) | `go.opentelemetry.io/otel` (+ sdk, otlptrace exporters, `otelhttp`), `go.uber.org/zap` (zapadapter), `google.golang.org/grpc` (grpcadapter) | `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` (+ `-grpc` extra) (tracing), `structlog` (extra) | `opentelemetry-api`, `-sdk`, `-exporter-otlp`, Jackson, Logback/Log4j2/servlet/OkHttp optional |
+| Other deps | `@opentelemetry/api`, `@opentelemetry/sdk-trace-base`, `@opentelemetry/sdk-trace-node`, `@opentelemetry/exporter-trace-otlp-http`, `@opentelemetry/exporter-trace-otlp-proto` (http/protobuf), `@opentelemetry/otlp-exporter-base`, `@opentelemetry/exporter-trace-otlp-grpc`, `@grpc/grpc-js`, `@opentelemetry/resources`, `@opentelemetry/semantic-conventions`, `@opentelemetry/core` (tracing only) | `thiserror`, `zeroize`, `rand`, `url`, `bytes`, `futures`, `async-trait`, `tracing`, `opentelemetry` + `opentelemetry_sdk` + `opentelemetry-otlp` (tracing), `tracing-subscriber`, `log`, `tower`, `reqwest-middleware` (optional) | `go.opentelemetry.io/otel` (+ sdk, otlptrace exporters, `otelhttp`), `go.uber.org/zap` (zapadapter), `google.golang.org/grpc` (grpcadapter) | `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` (+ `-grpc` extra) (tracing), `structlog` (extra) | `opentelemetry-api`, `-sdk`, `-exporter-otlp`, Jackson, Logback/Log4j2/servlet/OkHttp optional |
 | Tests | vitest + `@vitest/coverage-v8`, `undici` `MockAgent` or a local `http` server | `tokio::test`, `wiremock`, `cargo-llvm-cov` | `testing`, `net/http/httptest` | pytest, pytest-cov, `respx`, pytest-asyncio | JUnit 5, JDK `HttpServer` mocks (or WireMock), JaCoCo |
 | Lint/format | ESLint (typescript-eslint, flat config) + Prettier, `tsc --noEmit` strict | `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings` | `gofmt -l`, `go vet`, golangci-lint (CI) | ruff (lint + format), `mypy --strict` | Spotless (google-java-format), `-Xlint:all -Werror` |
 | Docs | TypeDoc | rustdoc (docs.rs) | pkg.go.dev doc comments | mkdocstrings | Javadoc |
@@ -558,7 +565,7 @@ Format (`spec/schemas/scenario.schema.json`):
 Integration tests (real Docker service) run separately from the coverage gate and are not counted.
 
 **Licence allowlist (runtime dependencies):** Apache-2.0, MIT, BSD-2-Clause, BSD-3-Clause, ISC,
-Zlib, Unicode-3.0, Unicode-DFS-2016, 0BSD, CC0-1.0, PSF-2.0, MPL-2.0 (unmodified dependency only). Never GPL,
+Zlib, Unicode-3.0, Unicode-DFS-2016, 0BSD, CC0-1.0, MIT-0, PSF-2.0, MPL-2.0 (unmodified dependency only). Never GPL,
 LGPL, AGPL, SSPL, BUSL, EPL as a runtime dependency (EPL tools like JaCoCo are build-only).
 
 **Resource limits on the shared dev server** (agents): `CARGO_BUILD_JOBS=4`, Maven `-T 1`, Go
@@ -584,3 +591,48 @@ LGPL, AGPL, SSPL, BUSL, EPL as a runtime dependency (EPL tools like JaCoCo are b
 - Every public function of the package is called at least once against the real service with a
   round-trip assertion (write → read back, send → query back). Functions the emulator/service cannot
   serve are listed in `docs/compatibility.md` with the reason and covered by unit tests.
+
+---
+
+## 9. Releases
+
+- **Conventional Commit PR titles.** Pull requests are squash-merged and the squash commit takes the
+  PR title, so the title must read `<type>[(<scope>)][!]: <description>` with type `feat`, `fix`,
+  `perf`, `revert`, `deps`, `docs`, `refactor`, `test`, `build`, `ci` or `chore`, e.g.
+  `feat: add KV v2 metadata (GRO-123)`. Scope = the language folder when one package changes.
+  release-please skips any other title ("commit could not be parsed"), so `GRO-123: …` releases
+  nothing. The reusable `pr-title.yml` workflow (called from the generated `ci.yml`) enforces it;
+  the repository setting "squash merge commit title = PR title" must be on.
+- **Release PR.** `release.yml` → reusable `release-packages.yml` runs release-please in manifest
+  mode on every push to `main`: one release PR for the five packages (`release-please-config.json`,
+  components `typescript rust go python java`, `.release-please-manifest.json` lists all five; `0.0.0`
+  = not released yet, the first release uses `initial-version`). The PR bumps `package.json`,
+  `Cargo.toml`, `pom.xml` and the version constants through `extra-files` with
+  `x-release-please-version` markers (`typescript/src/core/version.ts`, `go/version.go`,
+  `python/src/grow_<key_snake>/_version.py`, `java/pom.xml`; Rust reads `CARGO_PKG_VERSION`, Java
+  filters `${project.version}` into `sdk.properties`). Java uses `"skip-snapshot": true`. Merging it
+  tags `typescript-vX.Y.Z`, `rust-vX.Y.Z`, `go/vX.Y.Z`, `python-vX.Y.Z`, `java-vX.Y.Z` and publishes.
+  `sdk-kit sync` renders each language with its released version, so release bumps never conflict.
+- **Registries.** npm `@grow-codes/<key>` (`npm publish --provenance`, trusted publishing or
+  `NPM_TOKEN`), crates.io `grow-<key>` (trusted publishing or `CARGO_REGISTRY_TOKEN`), PyPI
+  `grow-<key>` (trusted publishing from the caller `release.yml`, environment `pypi`), Maven Central
+  `codes.grow.packages:<key>` (Central Portal token + GPG key, `release` profile), Go = the
+  `go/vX.Y.Z` tag plus a proxy.golang.org warm-up. A registry that is not configured yet ends its
+  job green with a notice.
+- **Release readiness.** `make release-check` (root: `release-config` + every language) must pass
+  before a release: release-please config/manifest/version files, registry metadata, and a dry run
+  (`npm publish --dry-run`, `cargo publish --dry-run`, `twine check --strict` + fresh-venv import,
+  `mvn -P release -Dgpg.skip=true verify` with sources + javadoc jars, Go module path / no `replace`
+  / `go mod tidy -diff` / `version.go`). The language CI jobs run it after `make pack`.
+- **Owner setup** (per repository, once): npm trusted publisher (repo, `release.yml`) + variable
+  `NPM_TRUSTED_PUBLISHING=true` (or secret `NPM_TOKEN`); crates.io trusted publisher + variable
+  `CRATES_TRUSTED_PUBLISHING=true` (or `CARGO_REGISTRY_TOKEN`; the first publish of a new crate needs
+  a token); PyPI pending trusted publisher (environment `pypi`) + variable
+  `PYPI_TRUSTED_PUBLISHING=true`; Maven Central verified namespace `codes.grow.packages` + secrets
+  `MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `MAVEN_GPG_PRIVATE_KEY`,
+  `MAVEN_GPG_PASSPHRASE` (public key on a key server); optional `RELEASE_PLEASE_TOKEN` so the
+  release PR triggers CI.
+- **Public repositories required.** npm provenance (`--provenance`) is rejected for private source
+  repositories, and proxy.golang.org / `go get` cannot fetch a private module. The repositories are
+  private today by owner decision, so npm (with provenance) and Go cannot publish until they are made
+  public; crates.io, PyPI and Maven Central do not depend on repository visibility.

@@ -2,7 +2,8 @@
 #
 # Checks out sdk-kit at `sdk-kit-ref` next to the repo and runs `sdk-kit check --dest .`:
 # manifest (.sdk-kit.json), required files and badges, no template tokens left, generated files
-# unmodified. Also reports (without failing) whether `sdk-kit sync` would change anything.
+# unmodified. Also reports (without failing) whether `sdk-kit sync` would change anything, and runs
+# `make release-config` (release-please config, manifest and package versions; needs no sdk-kit).
 #
 #   jobs:
 #     check:
@@ -76,6 +77,14 @@ jobs:
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
+
+      - name: release config (make release-config)
+        run: |
+          if ! grep -q '^release-config:' "$WD/Makefile"; then
+            echo "::warning title=release-config skipped::the root Makefile has no release-config target yet; run 'sdk-kit sync'"
+            exit 0
+          fi
+          make -C "$WD" release-config
 
       - name: sdk-kit check
         if: steps.kit.outcome == 'success'

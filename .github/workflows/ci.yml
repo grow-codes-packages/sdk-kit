@@ -1,5 +1,6 @@
 # sdk-kit CI.
 #
+#   pr-title     PR title is a Conventional Commit (./.github/workflows/pr-title.yml)
 #   generator    `make lint test` (generator unit tests + coverage gate) and `make check-all`
 #                (render all 17 services + demo, then `sdk-kit check` on each)
 #   render       `sdk-kit new demo` → artifact `demo-source` (source.tar keeps file modes)
@@ -26,6 +27,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  pr-title:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/pr-title.yml
+    permissions:
+      contents: read
+      pull-requests: read
+
   generator:
     name: generator (python ${{ matrix.python }})
     runs-on: ubuntu-24.04

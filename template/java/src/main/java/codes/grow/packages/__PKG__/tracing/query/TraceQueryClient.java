@@ -18,7 +18,7 @@ public interface TraceQueryClient {
   /**
    * Fetches one trace.
    *
-   * @param traceId trace id (normalised with {@link TraceIds#normalizeTraceId})
+   * @param traceId trace id (normalised with {@link TraceIds#traceId})
    * @return the trace, or empty when the service does not know it (yet)
    */
   Optional<Trace> getTrace(String traceId);
@@ -67,7 +67,7 @@ public interface TraceQueryClient {
    * @throws TimeoutException when the trace is not complete in time
    */
   default Trace waitForTrace(String traceId, WaitForTraceOptions options) {
-    String id = TraceIds.normalizeTraceId(traceId);
+    String id = TraceIds.traceId(traceId);
     return Poll.until(
         "traces.waitForTrace " + id,
         options.timeout(),

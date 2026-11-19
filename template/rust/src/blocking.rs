@@ -1,5 +1,7 @@
 // Skeleton created by sdk-kit __SDK_KIT_VERSION__; owned by this repository (edit freely).
-//! Blocking wrapper (feature `blocking`). Each client owns a current-thread tokio runtime.
+//! Blocking wrapper (feature `blocking`). Each client owns a tokio runtime with one worker
+//! thread, so background work (log batching, exports, watchers, retries' timers) keeps running
+//! between blocking calls.
 //!
 //! Do not use it from inside an async runtime (calls would panic); use the async client there.
 
@@ -19,7 +21,9 @@ pub struct __SERVICE__Client {
 impl __SERVICE__Client {
     /// Creates a client from a configuration.
     pub fn new(config: __SERVICE__Config) -> Result<Self> {
-        let runtime = tokio::runtime::Builder::new_current_thread()
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .thread_name("grow-__KEY__-blocking")
             .enable_all()
             .build()
             .map_err(|e| Error::config("cannot start the tokio runtime").with_source(e))?;

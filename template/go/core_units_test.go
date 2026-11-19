@@ -332,7 +332,7 @@ func TestCoreLifecycle(t *testing.T) {
 	}
 
 	t.Run("core.close.idempotent", func(t *testing.T) {
-		ts := newTestServer(t, status(http.StatusOK))
+		ts := newTestServer(t, statusHandler(http.StatusOK))
 		tr := newTestTransport(t, ts.URL, nil)
 		tr.close()
 		tr.close()

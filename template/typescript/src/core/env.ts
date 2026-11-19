@@ -75,7 +75,7 @@ export class EnvReader {
   readonly #env: EnvMap;
 
   /**
-   * @param prefix e.g. `"GROW_OPENBAO_"`.
+   * @param prefix e.g. `"GROW___KEY_UPPER___"`.
    * @param env environment map, defaults to `process.env`.
    */
   constructor(prefix: string, env: EnvMap = process.env) {

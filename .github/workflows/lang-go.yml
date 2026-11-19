@@ -1,6 +1,7 @@
 # Reusable Go pipeline for Grow Codes SDK repos (sdk-kit).
 #
-# Runs the language Makefile contract (deps lint build test coverage license pack) in
+# Runs the language Makefile contract (deps lint build test coverage license pack)
+# plus `make release-check` (release readiness, dry-run publish) on the primary job in
 # `working-directory` on Go 1.26 and 1.27 (both run every target: the coverage gate and lint
 # are cheap in Go). The Go 1.26 job uploads `coverage/summary.json` as `coverage-go`.
 # golangci-lint and go-licenses are installed so the Makefile does not `go run` them.
@@ -91,6 +92,15 @@ jobs:
 
       - name: make ${{ matrix.targets }}
         run: make -C "$WD" ${{ matrix.targets }}
+
+      - name: make release-check
+        if: matrix.primary
+        run: |
+          if ! grep -q '^release-check:' "$WD/Makefile"; then
+            echo "::warning title=release-check skipped::$WD/Makefile has no release-check target yet; update it from sdk-kit (template/go/Makefile)"
+            exit 0
+          fi
+          make -C "$WD" release-check
 
       - name: Upload coverage summary
         if: matrix.primary && inputs.upload-artifacts

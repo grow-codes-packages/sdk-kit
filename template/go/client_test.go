@@ -129,11 +129,11 @@ func TestClient(t *testing.T) {
 	})
 
 	t.Run("server version errors", func(t *testing.T) {
-		ts404 := newTestServer(t, status(http.StatusNotFound))
+		ts404 := newTestServer(t, statusHandler(http.StatusNotFound))
 		if _, err := newTestClient(t, ts404.URL, nil).ServerVersion(t.Context()); !errors.Is(err, ErrUnsupported) {
 			t.Fatalf("no version endpoint: %v", err)
 		}
-		ts500 := newTestServer(t, status(http.StatusInternalServerError))
+		ts500 := newTestServer(t, statusHandler(http.StatusInternalServerError))
 		c := newTestClient(t, ts500.URL, func(cfg *Config) { cfg.Retry = fastRetry(0) })
 		if _, err := c.ServerVersion(t.Context()); !errors.Is(err, ErrUnavailable) {
 			t.Fatalf("version 500: %v", err)

@@ -116,6 +116,44 @@ def _unescape(body: str) -> str:
     return "".join(out)
 
 
+# ClickHouse parses HTTP ``param_<name>`` values in the escaped (TabSeparated) text format.
+_TSV_ESCAPES = {
+    "\\": "\\",
+    "t": "\t",
+    "n": "\n",
+    "r": "\r",
+    "0": "\0",
+    "b": "\b",
+    "f": "\f",
+    "a": "\a",
+    "v": "\v",
+    "'": "'",
+    '"': '"',
+}
+
+
+def unescape_param(raw: str) -> str:
+    """Decodes a ``param_<name>`` value like ClickHouse's escaped (TSV) reader.
+
+    ``\\\\`` → backslash, ``\\t`` → tab, ``\\n`` → newline, ``\\r`` → CR (plus ``\\0 \\b \\f \\a \\v
+    \\' \\"``); a backslash before any other character is dropped, a trailing one is kept.
+    """
+    if "\\" not in raw:
+        return raw
+    out = []
+    i = 0
+    while i < len(raw):
+        ch = raw[i]
+        if ch == "\\" and i + 1 < len(raw):
+            nxt = raw[i + 1]
+            out.append(_TSV_ESCAPES.get(nxt, nxt))
+            i += 2
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
 _INT_RE = re.compile(r"[+-]?\d+")
 _FLOAT_RE = re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?|[+-]?(inf|nan)", re.IGNORECASE)
 
@@ -134,6 +172,7 @@ def bind_parameter(name: str, type_name: str, raw: str, pos: int) -> Token:
 
     if nullable and raw == "\\N":
         return Token("lit", "NULL", pos, None)
+    raw = unescape_param(raw)
     if lower == "identifier":
         return Token("qident", raw, pos)
     if lower in ("string", "uuid") or lower.startswith(("fixedstring(", "lowcardinality(", "enum")):

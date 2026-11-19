@@ -44,6 +44,11 @@ export interface InitTracingOptions {
   propagators?: Record<string, () => TextMapPropagator>;
   /** Extra span processors added after the batch processor. */
   spanProcessors?: SpanProcessor[];
+  /**
+   * Sampler that replaces the one built from `config.sampler`/`samplerRatio` (e.g. a remote
+   * sampler such as Jaeger's). `config.sampler` is still validated and reported in `toString()`.
+   */
+  sampler?: Sampler;
   /** Custom id generator (tests). */
   idGenerator?: IdGenerator;
 }
@@ -156,7 +161,7 @@ export function initTracingWith(
   ];
   const provider = new NodeTracerProvider({
     resource: defaultResource().merge(resourceFromAttributes(attributes)),
-    sampler: createSampler(resolved),
+    sampler: options.sampler ?? createSampler(resolved),
     spanProcessors: processors,
     ...(options.idGenerator !== undefined ? { idGenerator: options.idGenerator } : {}),
   });

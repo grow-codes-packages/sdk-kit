@@ -237,11 +237,29 @@ def _file_mode(st_mode: int) -> int:
     return 0o755 if stat.S_IMODE(st_mode) & 0o111 else 0o644
 
 
+def lang_of(path: str) -> str | None:
+    """Language whose package a rendered path belongs to (``go/x.go``, ``examples/go/...``)."""
+    parts = path.split("/")
+    if parts[0] in LANGS:
+        return parts[0]
+    if len(parts) > 2 and parts[0] == "examples" and parts[1] in LANGS:
+        return parts[1]
+    return None
+
+
 def render(
-    kit: Kit, service: Service, package_version: str = DEFAULT_PACKAGE_VERSION
+    kit: Kit,
+    service: Service,
+    package_version: str = DEFAULT_PACKAGE_VERSION,
+    lang_versions: Mapping[str, str] | None = None,
 ) -> dict[str, RenderedFile]:
-    """Render the whole repository for ``service`` into memory: ``{path: RenderedFile}``."""
+    """Render the whole repository for ``service`` into memory: ``{path: RenderedFile}``.
+
+    ``lang_versions`` overrides ``__VERSION__`` for the files of one language package (the
+    versions release-please has released since, see :func:`sdk_kit.generate.released_versions`).
+    """
     tokens = service.tokens(package_version)
+    per_lang = {lang: {**tokens, "VERSION": version} for lang, version in (lang_versions or {}).items()}
     present = set(service.categories)
     files: dict[str, RenderedFile] = {}
 
@@ -261,6 +279,7 @@ def render(
             if path_categories(rel, config, rel_text) - present:
                 continue
             out_path = f"{src.dest}/{rel_text}" if src.dest else rel_text
+            file_tokens = per_lang.get(lang_of(out_path) or "", tokens)
             source_name = origin.relative_to(kit.root).as_posix()
             if src.dest == "" and rel_text == "CLAUDE.md":
                 continue  # always recreated below as a symlink to AGENTS.md
@@ -279,7 +298,7 @@ def render(
             text = None if src.raw else decode_text(data)
             if text is not None:
                 text = apply_blocks(text, service.categories, source_name)
-                text = replace_tokens(text, tokens)
+                text = replace_tokens(text, file_tokens)
                 data = text.encode("utf-8")
             generated = text is not None and is_generated_text(text)
             add(RenderedFile(out_path, data=data, mode=mode, generated=generated, source=source_name))

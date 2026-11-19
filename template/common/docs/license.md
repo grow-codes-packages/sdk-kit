@@ -9,7 +9,7 @@ The SDK packages in this repository are licensed under the
 Copyright Grow Codes. See the `NOTICE` file for attributions.
 
 All runtime dependencies use permissive licences only: Apache-2.0, MIT, BSD-2-Clause,
-BSD-3-Clause, ISC, Zlib, Unicode-3.0, Unicode-DFS-2016, 0BSD, CC0-1.0 or MPL-2.0 (unmodified).
+BSD-3-Clause, ISC, Zlib, Unicode-3.0, Unicode-DFS-2016, 0BSD, CC0-1.0, MIT-0 or MPL-2.0 (unmodified).
 CI checks this for every package.
 
 ## __DISPLAY__
@@ -22,9 +22,9 @@ This SDK is a client library. It does not include or redistribute __DISPLAY__.
 
 ## Trademarks
 
-__DISPLAY__ and related names and logos are trademarks of __VENDOR__. They are used here only to
+__DISPLAY__ and related names and logos are trademarks of their owner (__VENDOR__); they are used here only to
 identify the service this SDK works with. **This project is independent: it is not affiliated
-with, sponsored by or endorsed by __VENDOR__.**
+with, sponsored by or endorsed by its owner (__VENDOR__).**
 
 ## No warranty
 

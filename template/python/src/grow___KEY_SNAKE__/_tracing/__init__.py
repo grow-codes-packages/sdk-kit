@@ -9,6 +9,8 @@ from ._adapters import (
     instrument_requests_session,
 )
 from ._config import (
+    DEFAULT_TRACE_PROPAGATORS,
+    DEFAULT_TRACE_PROTOCOL,
     KNOWN_PROPAGATORS,
     SAMPLERS,
     Compression,
@@ -80,6 +82,8 @@ from ._setup import (
 
 __all__ = [
     # config + setup
+    "DEFAULT_TRACE_PROPAGATORS",
+    "DEFAULT_TRACE_PROTOCOL",
     "KNOWN_PROPAGATORS",
     "SAMPLERS",
     "Compression",

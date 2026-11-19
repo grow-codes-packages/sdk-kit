@@ -324,6 +324,7 @@ def test_report() -> None:
 
 
 def test_scenario_loading(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(r.SCENARIOS_ENV, raising=False)  # CI may point it elsewhere
     real = r.find_scenarios_dir()
     assert (real / "core.health.json").is_file()
     ids = [s["id"] for s in r.load_scenarios(real, ["core"])]

@@ -251,6 +251,9 @@ class AsyncSecretCache(AsyncBaseSecretsProvider):
     async def _refresh(self, key: _Key) -> None:
         try:
             value = await self._load(key)
+        except asyncio.CancelledError:
+            self._state.refresh_failed(key)  # a later lookup may schedule a new refresh
+            raise
         except Exception as exc:  # noqa: BLE001 - keep serving the cached value
             self._state.refresh_failed(key)
             self._log.debug("secret cache refresh failed", {"error": type(exc).__name__})

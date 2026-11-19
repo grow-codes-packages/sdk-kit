@@ -7,7 +7,7 @@ use std::time::Duration;
 use super::error::{Error, Result};
 use super::secret::Secret;
 
-/// Prefix of every SDK variable, e.g. `GROW_OPENBAO_`.
+/// Prefix of every SDK variable: `GROW___KEY_UPPER___`.
 pub const ENV_PREFIX: &str = "GROW___KEY_UPPER___";
 
 /// Reads configuration variables.

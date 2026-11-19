@@ -4,6 +4,7 @@ package codes.grow.packages.__PKG__.secrets;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import codes.grow.packages.__PKG__.core.CancelledException;
 import codes.grow.packages.__PKG__.core.UnavailableException;
 import codes.grow.packages.__PKG__.testing.secrets.InMemorySecretsProvider;
 import java.time.Clock;
@@ -176,6 +177,19 @@ class SecretCacheTest {
     c.invalidate("b");
     c.close();
     assertThat(c.stats().size()).isZero();
+    c.close();
+    List<Runnable> closedCalls =
+        List.of(
+            () -> c.get("a"),
+            () -> c.list(""),
+            () -> c.getAll(""),
+            () -> c.set("a", "2"),
+            () -> c.delete("a"),
+            () -> c.metadata("a", GetOptions.none()),
+            () -> c.watch("a", Duration.ofSeconds(1), (n, o) -> {}, WatchOptions.none()));
+    for (Runnable call : closedCalls) {
+      assertThatThrownBy(call::run).isInstanceOf(CancelledException.class);
+    }
   }
 
   @Test

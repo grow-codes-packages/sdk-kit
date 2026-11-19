@@ -19,13 +19,18 @@
 mod core_ops;
 mod expect;
 pub mod runner;
+pub mod service;
 
-pub use core_ops::CoreHandler;
+pub use core_ops::{CoreHandler, CoreTarget};
 pub use expect::{check_expectation, json_matches};
 pub use runner::{
     load_scenarios, run_id, CategoryHandler, ConformanceReport, ConformanceRunner, Scenario,
     ScenarioResult, ScenarioSession, ScenarioStatus, Step, StepOutput, Vars,
 };
+/// Service-owned additions (`src/testing/service.rs`).
+#[doc(inline)]
+#[allow(unused_imports)]
+pub use service::*;
 
 // @sdk-kit:if logging
 pub mod logging;

@@ -12,6 +12,7 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
+from grow___KEY_SNAKE__._core.errors import CancelledError
 from grow___KEY_SNAKE__._tracing import (
     TracingASGIMiddleware,
     TracingWSGIMiddleware,
@@ -117,6 +118,19 @@ async def test_asgi_errors_and_passthrough(
     await call_asgi(TracingASGIMiddleware(lifespan_app), {"type": "lifespan"})
     assert lifespan_calls == ["lifespan"]
     assert len(exporter.spans) == 2
+
+
+async def test_asgi_cancelled_request_is_not_an_error(
+    setup: tuple[otel_trace.Tracer, InMemorySpanExporter],
+) -> None:
+    tracer, exporter = setup
+
+    async def gone(scope: Any, receive: Any, send: Any) -> None:
+        raise CancelledError("handler: cancelled")
+
+    with pytest.raises(CancelledError):
+        await call_asgi(TracingASGIMiddleware(gone, tracer=tracer), http_scope())
+    assert exporter.spans[0].status.code == "unset"
 
 
 # --------------------------------------------------------------------------- WSGI

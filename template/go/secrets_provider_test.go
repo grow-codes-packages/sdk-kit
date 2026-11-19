@@ -248,6 +248,36 @@ func TestBaseSecretsProvider(t *testing.T) {
 	}
 }
 
+func TestClosedProviderIsCancelled(t *testing.T) {
+	ctx := t.Context()
+	p := testkit.NewInMemorySecretsProvider()
+	if _, err := p.Set(ctx, "app/a", "v", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Close(); err != nil {
+		t.Fatal(err)
+	}
+	calls := map[string]error{}
+	_, calls["get"] = p.Get(ctx, "app/a", nil)
+	_, _, calls["getString"] = p.GetString(ctx, "app/a", nil)
+	_, calls["exists"] = p.Exists(ctx, "app/a", nil)
+	_, calls["getAll"] = p.GetAll(ctx, "app")
+	_, calls["list"] = p.List(ctx, "app")
+	_, calls["set"] = p.Set(ctx, "app/a", "w", nil)
+	calls["delete"] = p.Delete(ctx, "app/a", nil)
+	_, calls["metadata"] = p.Metadata(ctx, "app/a", nil)
+	_, calls["loadEnv"] = p.LoadEnv(ctx, "app", nil)
+	_, calls["loadEnvMapping"] = p.LoadEnvMapping(ctx, map[string]string{"A": "app/a"}, nil)
+	for op, err := range calls {
+		if !errors.Is(err, __PKG__.ErrCancelled) || !strings.Contains(err.Error(), "client is closed") {
+			t.Errorf("%s after Close: %v", op, err)
+		}
+	}
+	if err := p.Close(); err != nil {
+		t.Fatal("Close must be idempotent")
+	}
+}
+
 func TestGetAllSkipsVanishedSecrets(t *testing.T) {
 	p := __PKG__.NewSecretsProvider(vanishing{})
 	all, err := p.GetAll(t.Context(), "x")

@@ -1,42 +1,59 @@
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { __SERVICE__Client } from "../../src/client.js";
+import { describe, expect, it } from "vitest";
+import { CancelledError, healthStatus, type HealthStatus } from "../../src/core/index.js";
 import {
   type ConformanceOptions,
+  type CoreTarget,
   conformanceCases,
   formatReport,
   runConformance,
 } from "../../src/testing/index.js";
-import { type MockServer, startServer } from "../helpers/server.js";
 
 const scenariosDir = fileURLToPath(new URL("../../../conformance/scenarios/", import.meta.url));
-let server: MockServer;
 
-beforeAll(async () => {
-  server = await startServer((req) => {
-    if (req.url === "/health") return { status: 200, body: { status: "ok" } };
-    if (req.url === "/version") return { status: 200, body: { version: "0.0.1" } };
-    if (req.url === "/v1/ping") return { status: 200, body: {} };
-    return { status: 404 };
-  });
-});
+/**
+ * A fake core target: the runner and the `core` ops are tested without the client's real routes,
+ * so the client can change freely. The client itself is covered by `test/client.test.ts` and the
+ * integration suite.
+ */
+class FakeCoreTarget implements CoreTarget {
+  closed = 0;
 
-afterAll(async () => {
-  await server.close();
-});
+  #ensureOpen(op: string): void {
+    if (this.closed > 0) throw new CancelledError(`${op}: client is closed`);
+  }
+
+  health(): Promise<HealthStatus> {
+    this.#ensureOpen("health");
+    return Promise.resolve(healthStatus("ok"));
+  }
+
+  ping(): Promise<number> {
+    this.#ensureOpen("ping");
+    return Promise.resolve(1);
+  }
+
+  serverVersion(): Promise<string> {
+    this.#ensureOpen("serverVersion");
+    return Promise.resolve("0.0.1");
+  }
+
+  close(): Promise<void> {
+    this.closed += 1;
+    return Promise.resolve();
+  }
+}
 
 function options(): ConformanceOptions {
   return {
     scenariosDir,
     categories: ["core"],
-    factories: {
-      core: () => new __SERVICE__Client({ url: server.url, token: "conformance-token" }),
-    },
+    factories: { core: () => new FakeCoreTarget() },
     capabilities: { core: ["version"] },
   };
 }
 
-describe("conformance (core) against a local demo API", () => {
+describe("conformance (core) against a fake core target", () => {
   it("every core scenario passes", async () => {
     const report = await runConformance(options());
     expect(report.failed, formatReport(report)).toBe(0);

@@ -46,7 +46,8 @@ class RequestInfo:
 
 @dataclasses.dataclass(frozen=True)
 class ResponseInfo:
-    """Passed to ``Hooks.on_response``."""
+    """Passed to ``Hooks.on_response``; ``headers`` are the redacted response headers (rate
+    limit headers and the like stay readable)."""
 
     method: str
     url: str
@@ -54,6 +55,7 @@ class ResponseInfo:
     duration_ms: float
     attempt: int
     request_id: str | None = None
+    headers: Mapping[str, str] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)

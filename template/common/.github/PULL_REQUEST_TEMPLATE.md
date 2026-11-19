@@ -2,7 +2,8 @@
 
 ## What and why
 
-<!-- Use a Conventional Commit title: feat(go): …, fix: …, docs: … -->
+<!-- The PR title must be a Conventional Commit (the squash commit takes it; release-please reads it):
+     feat(go): … (GRO-123), fix: …, docs: … — types feat fix perf revert deps docs refactor test build ci chore -->
 
 ## Checklist
 

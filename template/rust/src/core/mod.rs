@@ -14,7 +14,7 @@ pub mod retry;
 pub mod secret;
 pub mod transport;
 
-pub use config::{CommonConfig, CommonConfigBuilder, TlsConfig};
+pub use config::{CommonConfig, CommonConfigBuilder, TlsConfig, VendorEnv};
 pub use env::{parse_bool, parse_duration, EnvReader};
 pub use error::{Error, ErrorCode, ErrorContext, Result};
 pub use health::HealthStatus;
@@ -23,4 +23,7 @@ pub use poll::{poll_until, PollOptions};
 pub use redact::REDACTED;
 pub use retry::{RandomSource, RetryPolicy};
 pub use secret::Secret;
-pub use transport::{CancellationToken, HttpTransport, Method, Response};
+pub use transport::{
+    build_reqwest_client, reqwest_client_builder, user_agent_for, CancellationToken, HttpTransport,
+    Method, Response,
+};

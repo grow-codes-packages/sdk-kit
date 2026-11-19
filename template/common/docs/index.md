@@ -43,5 +43,5 @@ Start with [Install](install.md) and the [Quickstart](quickstart.md).
 
 !!! note "Independent project"
     This SDK is made by [Grow Codes](https://grow.codes). __DISPLAY__ is a trademark of
-    __VENDOR__. This project is not affiliated with or endorsed by __VENDOR__. See
+    its owner (__VENDOR__); this project is not affiliated with or endorsed by it. See
     [License & disclaimer](license.md).

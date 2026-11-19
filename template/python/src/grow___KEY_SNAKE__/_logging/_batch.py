@@ -515,6 +515,8 @@ class AsyncBatchProcessor(_BatchCore):
                 await task
         try:
             await self._exporter.shutdown()
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:  # noqa: BLE001 - reported, never raised
             self._notify_error(exc, [])
 
@@ -602,6 +604,8 @@ class AsyncBatchProcessor(_BatchCore):
             )
         except asyncio.TimeoutError:
             return None, _errors.TimeoutError("logs.export: timed out")
+        except asyncio.CancelledError:
+            raise  # also the SDK CancelledError (an Exception): the worker task was cancelled
         except Exception as exc:  # noqa: BLE001 - exporter failures become stats + callbacks
             return None, exc
         return result, None

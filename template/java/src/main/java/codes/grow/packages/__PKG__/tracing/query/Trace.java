@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * A trace: its id and its spans sorted by start time, then span id.
  *
- * @param traceId 32 lower-hex characters
+ * @param traceId 32 lower-hex characters (or a native id, see {@link TraceIds#traceId})
  * @param spans spans (sorted on construction)
  */
 public record Trace(String traceId, List<Span> spans) {
@@ -18,7 +18,7 @@ public record Trace(String traceId, List<Span> spans) {
    * @param spans spans
    */
   public Trace {
-    traceId = TraceIds.normalizeTraceId(traceId);
+    traceId = TraceIds.traceId(traceId);
     spans = Traces.sortSpans(spans == null ? List.of() : spans);
   }
 

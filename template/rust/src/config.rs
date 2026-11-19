@@ -7,13 +7,15 @@ use std::time::Duration;
 
 use crate::core::{
     CommonConfig, CommonConfigBuilder, EnvReader, Hooks, Result, RetryPolicy, Secret, TlsConfig,
+    VendorEnv,
 };
 
 /// Endpoint used when neither the builder nor the environment sets one.
 pub const DEFAULT_URL: &str = "http://127.0.0.1:__PORT__";
 
-/// Vendor variables checked (in order) after `GROW___KEY_UPPER___URL`.
-const VENDOR_URL_VARS: &[&str] = &[];
+/// Vendor variables checked (in order) after the matching `GROW___KEY_UPPER___*` variable
+/// (`url`, `ca_cert`, `client_cert`, `client_key`, `insecure_skip_verify`, `proxy`).
+const VENDOR_ENV: VendorEnv<'static> = VendorEnv::NONE;
 /// Vendor variables checked (in order) after `GROW___KEY_UPPER___TOKEN`.
 const VENDOR_TOKEN_VARS: &[&str] = &[];
 
@@ -159,7 +161,7 @@ impl __SERVICE__ConfigBuilder {
 
     /// Fills unset values from `env`, then builds.
     pub fn build_with_env(mut self, env: &EnvReader) -> Result<__SERVICE__Config> {
-        self.common = self.common.apply_env(env, VENDOR_URL_VARS)?;
+        self.common = self.common.apply_env_with(env, &VENDOR_ENV)?;
         if self.token.is_none() {
             self.token = env.secret("TOKEN", VENDOR_TOKEN_VARS);
         }

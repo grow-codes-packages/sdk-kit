@@ -75,7 +75,9 @@ func TestSecretsOpsExtras(t *testing.T) {
 	if rep.Failed != 1 || !strings.Contains(rep.Results[0].Reason, "does not implement SecretsProvider") {
 		t.Fatalf("wrong target: %+v", rep)
 	}
-	bad := SecretsFactory(func(context.Context) (__PKG__.SecretsProvider, error) { return nil, errors.New("down") })
+	bad := SecretsFactory(func(context.Context) (__PKG__.SecretsProvider, error) {
+		return nil, errors.New("down")
+	})
 	if _, err := bad(t.Context(), newEnv(&Scenario{}, Options{})); err == nil {
 		t.Fatal("factory error")
 	}
