@@ -20,7 +20,7 @@
     ".": {
       "release-type": "python",
       "package-name": "sdk-kit",
-      "initial-version": "0.3.0"
+      "initial-version": "0.1.0"
     }
   }
 }
