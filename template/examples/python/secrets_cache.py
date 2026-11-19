@@ -8,6 +8,11 @@ import grow___KEY_SNAKE__ as sdk
 from grow___KEY_SNAKE__.testing import InMemorySecretsProvider
 
 
+def connect_to_database(password: str) -> None:
+    """Stand-in for real code that needs the plain secret."""
+    assert password
+
+
 def main() -> None:
     provider = InMemorySecretsProvider()  # use the service's provider in real code
     provider.set("app/db-password", "s3cr3t")
@@ -15,8 +20,8 @@ def main() -> None:
     provider.set("app/features", {"beta": True})
 
     cache = sdk.SecretCache(provider, ttl_s=30, stale_while_revalidate_s=10)
-    password = cache.require("app/db-password")
-    print(password)  # SecretValue([REDACTED])
+    password = cache.require("app/db-password")  # a SecretValue: str()/repr() print [REDACTED]
+    connect_to_database(password.reveal())  # reveal() only where the plain value is needed
     print(cache.get_number("app/port"), cache.get_json("app/features"))
     print(cache.stats())
 
