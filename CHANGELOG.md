@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/grow-codes-packages/sdk-kit/compare/v0.3.0...v0.4.0) (2026-11-20)
+
+
+### Features
+
+* auth service category (oidc, casdoor) ([#14](https://github.com/grow-codes-packages/sdk-kit/issues/14)) ([afe3041](https://github.com/grow-codes-packages/sdk-kit/commit/afe3041965da1b7bd4fb63e040ea317f56032426))
+* foundation API (loadConfig, initLogging, request logging, canary) ([#16](https://github.com/grow-codes-packages/sdk-kit/issues/16)) ([165282a](https://github.com/grow-codes-packages/sdk-kit/commit/165282a486b084ebbc0a259e3ec50f94302dfd34))
+
+
+### Bug Fixes
+
+* **typescript:** linear slash trimming in loadConfig ([#17](https://github.com/grow-codes-packages/sdk-kit/issues/17)) ([41a541d](https://github.com/grow-codes-packages/sdk-kit/commit/41a541d5868560f8d0ccf12fe7ced9cf47f7d8df))
+
 ## [0.3.0](https://github.com/grow-codes-packages/sdk-kit/compare/v0.2.0...v0.3.0) (2026-11-19)
 
 
