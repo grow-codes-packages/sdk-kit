@@ -6,3 +6,4 @@ export { applyEnv, envNameFor, relativeName } from "./env.js";
 export * from "./types.js";
 export * from "./value.js";
 export * from "./watch.js";
+export * from "./load-config.js";

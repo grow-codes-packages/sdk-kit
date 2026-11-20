@@ -1,3 +1,12 @@
 {
-  "categories": {}
+  "categories": {
+    "secrets": [
+      "src/main/java/codes/grow/packages/__PKG__/SecretsConnect.java",
+      "src/test/java/codes/grow/packages/__PKG__/SecretsConnectTest.java"
+    ],
+    "logging": [
+      "src/main/java/codes/grow/packages/__PKG__/LogConnect.java",
+      "src/test/java/codes/grow/packages/__PKG__/LogConnectTest.java"
+    ]
+  }
 }

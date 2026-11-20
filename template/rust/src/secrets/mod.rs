@@ -6,12 +6,17 @@
 
 mod cache;
 mod env;
+mod load_config;
 mod provider;
 mod value;
 mod watch;
 
 pub use cache::{CacheStats, SecretCache, SecretCacheOptions};
 pub use env::{env_var_name, load_env_into, EnvSink, EnvSource, LoadEnvOptions, ProcessEnv};
+pub use load_config::{
+    connect_secrets, load_config, load_config_from, read_secrets_bootstrap, secrets_preloaded,
+    LoadOptions, SecretsBootstrap, SecretsConnection, SecretsConnector, SECRETS_BOOTSTRAP_ENV,
+};
 pub use provider::{BaseSecretsProvider, SecretMap, SecretsProvider};
 pub use value::{
     rfc3339, DeleteOptions, GetOptions, SecretData, SecretMetadata, SecretValue, SetOptions,
