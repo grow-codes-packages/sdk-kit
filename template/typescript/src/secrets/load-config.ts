@@ -8,6 +8,18 @@ import { envNameFor, relativeName } from "./env.js";
 import type { SecretsProvider } from "./types.js";
 import type { SignalOptions } from "./types.js";
 
+/**
+ * Strips leading and trailing slashes in linear time (a `/^\/+|\/+$/g`
+ * regex backtracks polynomially on long runs of slashes).
+ */
+function trimSlashes(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value.charCodeAt(start) === 47) start += 1;
+  while (end > start && value.charCodeAt(end - 1) === 47) end -= 1;
+  return value.slice(start, end);
+}
+
 /** Bootstrap variables a platform sets for a service (GRO-1390 foundation contract). */
 export const SECRETS_BOOTSTRAP_ENV = [
   "GROW_SECRETS_PROVIDER",
@@ -88,7 +100,7 @@ export function readSecretsBootstrap(
   const addr = text(env, "GROW_SECRETS_ADDR");
   if (provider === undefined && addr === undefined) return undefined;
   const bootstrap: SecretsBootstrap = {
-    path: (text(env, "GROW_SECRETS_PATH") ?? "").replace(/^\/+|\/+$/g, ""),
+    path: trimSlashes(text(env, "GROW_SECRETS_PATH") ?? ""),
     auth: (text(env, "GROW_SECRETS_AUTH") ?? "").toLowerCase(),
   };
   if (provider !== undefined) bootstrap.provider = provider;
