@@ -35,7 +35,7 @@ are kept only when the service has that category; the marker lines are always re
 nest. `@sdk-kit:if any(logging,tracing)` is also allowed.
 
 **Category paths.** A path belongs to a category when any path segment matches
-`^_?(secrets|logging|tracing)([_.-]|$)` (e.g. `src/logging/`, `logging_batch.go`, `_tracing/`,
+`^_?(secrets|logging|tracing|auth)([_.-]|$)` (e.g. `src/logging/`, `logging_batch.go`, `_tracing/`,
 `secrets-ops.ts`, `LoggingAppenderTest.java` does **not** match — use folders). Paths that do not
 follow the rule (e.g. Go `zapadapter/`) are listed in `template/<lang>/template.json`:
 `{"categories": {"logging": ["zapadapter"], "tracing": ["grpcadapter"]}}`. The generator drops a
@@ -591,6 +591,15 @@ LGPL, AGPL, SSPL, BUSL, EPL as a runtime dependency (EPL tools like JaCoCo are b
 - Every public function of the package is called at least once against the real service with a
   round-trip assertion (write → read back, send → query back). Functions the emulator/service cannot
   serve are listed in `docs/compatibility.md` with the reason and covered by unit tests.
+
+### 8.1 Category: Auth
+
+`auth` is the category of the identity packages (`oidc`: provider-neutral token verification;
+per-IdP admin clients such as `casdoor`). It has no shared template code yet: an `auth` service gets
+the core (sections 2 and 9) and owns its auth API outside the generated folders, documented in its
+own `docs/` and `AGENTS.md`. The category exists so `sdk-kit new … --categories auth` renders a
+repository without the secrets/logging/tracing modules, and so later shared auth code can live in
+`auth/` folders or `@sdk-kit:if auth` blocks.
 
 ---
 

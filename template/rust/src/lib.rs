@@ -48,7 +48,9 @@ pub mod secrets;
 // @sdk-kit:if tracing
 pub mod tracing;
 // @sdk-kit:endif
+// @sdk-kit:if any(secrets,logging,tracing)
 
+// @sdk-kit:endif
 pub use crate::core::{Error, ErrorCode, HealthStatus, Result, RetryPolicy, Secret};
 
 pub use crate::config::DEFAULT_URL;

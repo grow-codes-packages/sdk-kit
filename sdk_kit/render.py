@@ -44,7 +44,7 @@ IGNORED_NAMES = frozenset(
 )
 IGNORED_SUFFIXES = (".pyc", ".pyo", ".egg-info")
 
-CATEGORY_SEGMENT_RE = re.compile(r"^_?(secrets|logging|tracing)(?:[_.-]|$)")
+CATEGORY_SEGMENT_RE = re.compile(r"^_?(secrets|logging|tracing|auth)(?:[_.-]|$)")
 
 _MARKER_START_RE = re.compile(r"^\s*(?://|#|<!--|/\*|--)\s*@sdk-kit:")
 _MARKER_RE = re.compile(

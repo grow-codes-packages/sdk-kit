@@ -10,7 +10,11 @@ from typing import Any
 
 from sdk_kit import __version__
 
-CATEGORIES: tuple[str, ...] = ("secrets", "logging", "tracing")
+CATEGORIES: tuple[str, ...] = ("secrets", "logging", "tracing", "auth")
+"""Every category in canonical order. ``auth`` (token verification, identity providers) has no
+shared template code yet: an ``auth`` service gets the core and owns its auth code."""
+SERVICE_CATEGORIES: tuple[str, ...] = ("secrets", "logging", "tracing")
+"""The categories of the demo service (the ones with shared template code)."""
 LANGS: tuple[str, ...] = ("typescript", "rust", "go", "python", "java")
 DEFAULT_PACKAGE_VERSION = "0.1.0"
 
@@ -26,7 +30,7 @@ class ServiceError(ValueError):
 
 
 def normalize_categories(values: list[str] | tuple[str, ...] | str) -> tuple[str, ...]:
-    """Validate categories and return them in canonical order (secrets, logging, tracing)."""
+    """Validate categories and return them in canonical order (secrets, logging, tracing, auth)."""
     items: list[str] = []
     raw = [values] if isinstance(values, str) else list(values)
     for value in raw:
@@ -167,7 +171,7 @@ DEMO = Service(
     display="Demo",
     service="Demo",
     pkg="demo",
-    categories=CATEGORIES,
+    categories=SERVICE_CATEGORIES,
     image="sdk-kit-demo",
     port="8080",
     vendor="Grow Codes",

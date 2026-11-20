@@ -31,7 +31,6 @@ pub use runner::{
 #[doc(inline)]
 #[allow(unused_imports)]
 pub use service::*;
-
 // @sdk-kit:if logging
 pub mod logging;
 // @sdk-kit:endif

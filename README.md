@@ -63,7 +63,7 @@ docs) in file contents and paths.
   `@sdk-kit:endif` are kept only when the service has the category. Markers may use `//`, `#`,
   `<!-- -->`, `/* */` or `--` comments and are always removed. Blocks do not nest; a malformed
   marker or unknown category is an error that names the file and line.
-- **Category paths**: a path with a segment matching `^_?(secrets|logging|tracing)([_.-]|$)` belongs
+- **Category paths**: a path with a segment matching `^_?(secrets|logging|tracing|auth)([_.-]|$)` belongs
   to that category; other paths are listed in `template.json` of the template folder
   (`{"categories": {"logging": ["zapadapter"]}}`, exact path, folder prefix or glob). Paths of
   missing categories are dropped. `template.json` itself is not copied.
