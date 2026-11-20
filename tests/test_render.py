@@ -127,6 +127,8 @@ def test_path_categories_segment_rule() -> None:
         "src/test/LoggingAppenderTest.java": set(),
         "src/core/secretsmanager.ts": set(),
         "src/logging/tracing_bridge.ts": {"logging", "tracing"},
+        "src/auth/verifier.ts": {"auth"},
+        "src/core/authorization.ts": set(),
     }
     for path, expected in cases.items():
         assert path_categories(PurePosixPath(path), cfg) == expected, path

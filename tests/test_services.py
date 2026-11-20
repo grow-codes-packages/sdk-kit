@@ -7,8 +7,8 @@ import pytest
 
 from sdk_kit import __version__
 from sdk_kit.services import (
-    CATEGORIES,
     DEMO,
+    SERVICE_CATEGORIES,
     Service,
     ServiceError,
     find_service,
@@ -24,6 +24,8 @@ def test_normalize_categories_orders_and_splits() -> None:
     assert normalize_categories(["tracing", "secrets"]) == ("secrets", "tracing")
     assert normalize_categories("logging, tracing") == ("logging", "tracing")
     assert normalize_categories(["tracing,logging", "logging"]) == ("logging", "tracing")
+    assert normalize_categories(["auth", "secrets"]) == ("secrets", "auth")
+    assert normalize_categories("auth") == ("auth",)
 
 
 @pytest.mark.parametrize(
@@ -100,7 +102,7 @@ def test_tokens_match_spec_section_0() -> None:
 def test_with_categories_copies() -> None:
     svc = DEMO.with_categories(("logging",))
     assert svc.categories == ("logging",)
-    assert DEMO.categories == CATEGORIES
+    assert DEMO.categories == SERVICE_CATEGORIES
     assert svc.key == "demo"
 
 

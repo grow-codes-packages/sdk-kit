@@ -91,7 +91,7 @@ modified file is skipped as before.
 
   Renaming or removing a region makes sync skip every repository that has content in it; add a
   new region instead. `sdk-kit check` reports broken markers in generated files.
-- Category paths: a segment matching `^_?(secrets|logging|tracing)([_.-]|$)` (`src/logging/`,
+- Category paths: a segment matching `^_?(secrets|logging|tracing|auth)([_.-]|$)` (`src/logging/`,
   `secrets_cache.go`, `_tracing/`); others go into `template/<lang>/template.json`
   (`{"categories": {"logging": ["zapadapter"]}}`).
 - Put the generated header at the top of every file sdk-kit should keep in sync.

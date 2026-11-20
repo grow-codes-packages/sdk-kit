@@ -45,7 +45,7 @@ def _parser() -> argparse.ArgumentParser:
         "--categories",
         nargs="+",
         metavar="CATEGORY",
-        help="override the service categories (secrets logging tracing; commas also work)",
+        help="override the service categories (secrets logging tracing auth; commas also work)",
     )
     p_new.add_argument("--service-json", metavar="FILE", help="custom service definition (JSON)")
     p_new.add_argument(
