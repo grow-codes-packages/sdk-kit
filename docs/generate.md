@@ -59,7 +59,8 @@ Editing a region body therefore never blocks a sync, while an edit outside the r
 Regions in the template today: `docs/configuration.md` (`service-settings`, `examples`),
 `docs/client.md` (`functions`, `examples`, `service`), `docs/troubleshooting.md` (`connect`,
 `authentication`, `service`), `AGENTS.md` (`service-specifics`) and `java/pom.xml` (`description`, `properties`,
-`dependency-management`, `dependencies`, `compiler-args`, `plugins`). Malformed markers (unclosed,
+`dependency-management`, `dependencies`, `compiler-args`, `plugins`), and the Rust foundation
+connectors `rust/src/secrets/load_config.rs` and `rust/src/logging/init.rs` (`connector`). Malformed markers (unclosed,
 nested, duplicate names) fail rendering, and `sdk-kit check` reports them in generated files.
 
 ## After generating
@@ -83,3 +84,19 @@ primitives (for example the five secrets primitives), `docs/functions.md`,
 
 The `check` job of every repository's CI runs `sdk-kit check` and reports (without failing) when
 `sdk-kit sync --dry-run` would change files.
+
+## Foundation API (GRO-1390)
+
+Every generated repository also carries the one-call foundation API that service templates use:
+
+| Category | Generated (all five languages) | Service-owned connector (created once by `new`/`sync`) |
+| - | - | - |
+| secrets | `loadConfig` / `LoadConfig` / `load_config` / `ConfigLoader.load`: reads the `GROW_SECRETS_*` bootstrap, connects, reads every key under `GROW_SECRETS_PATH`, fails fast on missing required keys, writes the environment; skipped when `GROW_SECRETS_LOADED=1` | TS `src/secrets-connect.ts`, Go `secrets_connect.go`, Python `secrets_connect.py`, Java `SecretsConnect.java`, Rust keep region `connector` |
+| logging | `initLogging` / `InitLogging` / `init_logging` / `LoggingInit.initLogging`: JSON stdout lines, SDK transport when `GROW_LOGGING_PROVIDER` names the package (`log_shipped:"sdk"`, failed exports re-emitted as `"sdk_failed"`), request middleware, canary | TS `src/logging-connect.ts`, Go `logging_connect.go`, Python `logging_connect.py`, Java `LogConnect.java`, Rust keep region `connector` |
+
+The default connectors use the sdk-kit conventions (`client.secrets()`, `client.logClient({ resource })`)
+where the language allows it (TypeScript, Python, Java by reflection); services that log in (AppRole) or
+build their log client differently replace them. Each artifact ships an `AGENTS.md` quickstart (npm
+`files`, Go module root, wheel package data, jar `META-INF/grow/<key>/AGENTS.md`, crate `include`).
+`sdk-kit versions` writes `versions.json` (released version and install command per language, optional
+PyPI check); the docs workflow publishes a per-repo `versions.json` on every Pages deploy.

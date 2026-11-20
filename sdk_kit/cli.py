@@ -1,8 +1,9 @@
-"""Command line interface: ``sdk-kit new | sync | list | check``."""
+"""Command line interface: ``sdk-kit new | sync | list | check | versions``."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -22,6 +23,12 @@ from sdk_kit.services import (
     load_catalog,
     load_service_json,
     normalize_categories,
+)
+from sdk_kit.versions import (
+    build_versions,
+    manifest_from_dir,
+    manifest_from_github,
+    pypi_available,
 )
 
 
@@ -63,6 +70,17 @@ def _parser() -> argparse.ArgumentParser:
     p_sync.add_argument("--dry-run", action="store_true", help="report only, write nothing")
 
     sub.add_parser("list", help="list the services of spec/services.json")
+
+    p_versions = sub.add_parser(
+        "versions", help="write versions.json: released version + install command per language"
+    )
+    p_versions.add_argument(
+        "--repos-root",
+        metavar="DIR",
+        help="read .release-please-manifest.json from local clones DIR/<key> (default: GitHub main)",
+    )
+    p_versions.add_argument("--check-pypi", action="store_true", help="ask PyPI which versions exist")
+    p_versions.add_argument("--out", metavar="FILE", help="output file (default: stdout)")
 
     p_check = sub.add_parser("check", help="verify a generated repository (used by CI)")
     p_check.add_argument("--dest", metavar="DIR", default=".", help="repository (default: .)")
@@ -129,6 +147,23 @@ def _cmd_list(kit: Kit, out: TextIO) -> int:
     return 0
 
 
+def _cmd_versions(kit: Kit, args: argparse.Namespace, out: TextIO) -> int:
+    services = load_catalog(kit.services)
+    root = Path(args.repos_root) if args.repos_root else None
+
+    def manifest(key: str) -> dict[str, str]:
+        return manifest_from_dir(root, key) if root is not None else manifest_from_github(key)
+
+    doc = build_versions(services, manifest, pypi=pypi_available if args.check_pypi else None)
+    text = json.dumps(doc, indent=2, sort_keys=False) + "\n"
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+        out.write(f"wrote {args.out} ({len(services)} services)\n")
+    else:
+        out.write(text)
+    return 0
+
+
 def _cmd_check(args: argparse.Namespace, out: TextIO) -> int:
     problems = check(Path(args.dest), args.key)
     for problem in problems:
@@ -150,6 +185,8 @@ def main(argv: Sequence[str] | None = None, out: TextIO | None = None, err: Text
             return _cmd_sync(kit, args, out)
         if args.command == "list":
             return _cmd_list(kit, out)
+        if args.command == "versions":
+            return _cmd_versions(kit, args, out)
         return _cmd_check(args, out)
     except (ServiceError, RenderError, GenerateError, OSError) as exc:
         err.write(f"sdk-kit: error: {exc}\n")

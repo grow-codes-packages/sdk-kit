@@ -203,6 +203,25 @@ jobs:
               (out / f"coverage-{lang}.json").write_text(json.dumps(badge) + "\n")
               print(lang, badge["message"])
 
+      - name: Write versions.json
+        # Released version per language from .release-please-manifest.json (GRO-1390 P6), served at
+        # https://grow-codes-packages.github.io/<key>/versions.json. "sdk-kit versions" aggregates
+        # all services (with a PyPI check) for consumers that need every package at once.
+        shell: python
+        run: |
+          import json, os, pathlib
+
+          root = pathlib.Path(".")
+          meta = json.loads((root / ".sdk-kit.json").read_text()) if (root / ".sdk-kit.json").is_file() else {}
+          manifest_path = root / ".release-please-manifest.json"
+          manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {}
+          key = meta.get("key") or os.environ["GITHUB_REPOSITORY"].split("/")[-1]
+          versions = {lang: (v if v and v != "0.0.0" else None) for lang, v in manifest.items()}
+          doc = {"schema": 1, "key": key, "sdkKit": meta.get("sdkKitVersion"), "commit": os.environ.get("GITHUB_SHA"), "versions": versions}
+          out = pathlib.Path(os.environ["SITE_DIR"]) / "versions.json"
+          out.write_text(json.dumps(doc, indent=2) + "\n")
+          print(out.read_text())
+
       - name: Upload site (Pages)
         if: inputs.deploy
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
